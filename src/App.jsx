@@ -804,7 +804,10 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
 }
 
 // ─── SCREEN: Quiz Ready (choose mode) ────────────────────────────────────────
-function QuizReadyScreen({ questions, opts, onNavigate, onStartQuiz, user, showToast }) {
+function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate, onStartQuiz, user, showToast }) {
+  const stored = JSON.parse(sessionStorage.getItem('quizData') || '{}');
+  const questions = (questionsProp && questionsProp.length > 0) ? questionsProp : (stored.questions || []);
+  const opts = optsProp || stored.opts;
   const [pin, setPin] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [sharing, setSharing] = useState(false);
@@ -1039,10 +1042,14 @@ function QuizReadyScreen({ questions, opts, onNavigate, onStartQuiz, user, showT
 }
 
 // ─── SCREEN: Quiz Play ────────────────────────────────────────────────────────
-function QuizPlayScreen({ questions: questionsProp, mode, opts, onNavigate, showToast }) {
+function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsProp, onNavigate, showToast }) {
+  // Ultimate fallback: read from sessionStorage if props are empty
+  const stored = JSON.parse(sessionStorage.getItem('quizPlay') || '{}');
   const questions = (questionsProp && questionsProp.length > 0)
     ? questionsProp
-    : (window.__lastQuizData && window.__lastQuizData.questions) || [];
+    : (stored.questions && stored.questions.length > 0 ? stored.questions : []);
+  const mode = modeProp || stored.mode;
+  const opts = optsProp || stored.opts;
   const shuffled = useRef(questions.map(shuffleAnswers));
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -1567,12 +1574,22 @@ export default function App() {
   };
 
   const startQuiz = (questions, mode, opts) => {
-    // Store directly in ref - guaranteed to persist
-    quizRef.current = { questions: questions || [], mode, opts };
-    setScreen('play');
+    // Always pull from sessionStorage as the source of truth
+    const stored = JSON.parse(sessionStorage.getItem('quizData') || '{}');
+    const safeQ = (questions && questions.length > 0)
+      ? questions
+      : (stored.questions && stored.questions.length > 0 ? stored.questions : []);
+    const safeOpts = (opts && Object.keys(opts).length > 0) ? opts : stored.opts;
+    const playData = { questions: safeQ, mode, opts: safeOpts };
+    sessionStorage.setItem('quizPlay', JSON.stringify(playData));
+    quizRef.current = playData;
+    // Force screen update AFTER data is stored
+    setTimeout(() => setScreen('play'), 0);
   };
 
   const onQuizReady = (questions, opts) => {
+    const data = { questions: questions || [], opts };
+    sessionStorage.setItem('quizData', JSON.stringify(data));
     quizRef.current = { questions: questions || [], mode: null, opts };
     setScreen('ready');
   };
