@@ -555,7 +555,7 @@ function JoinScreen({ onNavigate, onStartQuiz }) {
 
 // ─── SCREEN: Generate ─────────────────────────────────────────────────────────
 function GenerateScreen({ onNavigate, onQuizReady, user }) {
-  const [source, setSource] = useState('text'); // 'text' | 'pdf' | 'image'
+  const [source, setSource] = useState('text');
   const [topic, setTopic] = useState('');
   const [file, setFile] = useState(null);
   const [count, setCount] = useState(10);
@@ -575,10 +575,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
     if (!f) return;
     const isPdf = f.type === 'application/pdf';
     const isImg = f.type.startsWith('image/');
-    if (!isPdf && !isImg) {
-      setError('Nur PDF oder Bilddateien sind erlaubt.');
-      return;
-    }
+    if (!isPdf && !isImg) { setError('Nur PDF oder Bilddateien erlaubt.'); return; }
     setFile(f);
     setSource(isPdf ? 'pdf' : 'image');
     setError('');
@@ -589,10 +586,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
     let val = 5;
     intervalRef.current = setInterval(() => {
       val += Math.random() * 8;
-      if (val >= 88) {
-        clearInterval(intervalRef.current);
-        val = 88;
-      }
+      if (val >= 88) { clearInterval(intervalRef.current); val = 88; }
       setProgress(val);
     }, 600);
   };
@@ -604,57 +598,35 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   };
 
   const handleGenerate = async () => {
-    if (source === 'text' && !topic.trim()) {
-      setError('Bitte gib ein Thema oder einen Text ein.');
-      return;
-    }
-    if ((source === 'pdf' || source === 'image') && !file) {
-      setError('Bitte wähle eine Datei aus.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    startProgress();
-
+    if (source === 'text' && !topic.trim()) { setError('Bitte gib ein Thema oder einen Text ein.'); return; }
+    if ((source === 'pdf' || source === 'image') && !file) { setError('Bitte wähle eine Datei aus.'); return; }
+    setLoading(true); setError(''); startProgress();
     try {
       let body = { source, count, difficulty, level };
-
       if (file) {
         const b64 = await toBase64(file);
-        body.imageData = b64;
-        body.imageType = file.type;
+        body.imageData = b64; body.imageType = file.type;
       } else {
         body.content = topic;
       }
-
       let allQuestions = [];
-
       if (file) {
-        // PDF/Image: single request (can't split file across batches)
-        // Limit to 10 questions max to stay within timeout
         const safeCount = Math.min(count, 10);
         const res = await fetch('/.netlify/functions/generate-quiz', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...body, count: safeCount }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
         allQuestions = data.questions || [];
       } else {
-        // Text: split into batches of 5 to avoid timeouts
         const BATCH = 5;
         const batches = [];
         let remaining = count;
-        while (remaining > 0) {
-          batches.push(Math.min(BATCH, remaining));
-          remaining -= BATCH;
-        }
+        while (remaining > 0) { batches.push(Math.min(BATCH, remaining)); remaining -= BATCH; }
         for (let i = 0; i < batches.length; i++) {
           const res = await fetch('/.netlify/functions/generate-quiz', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...body, count: batches[i] }),
           });
           const data = await res.json();
@@ -663,63 +635,117 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
           setProgress(Math.min(88, 20 + (i + 1) * (65 / batches.length)));
         }
       }
-
       stopProgress();
       onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert' });
     } catch (e) {
-      stopProgress();
-      setError(e.message);
+      stopProgress(); setError(e.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const sources = [
+    { id: 'text',  label: 'Thema / Text', icon: '✦' },
+    { id: 'pdf',   label: 'PDF',          icon: '⬡' },
+    { id: 'image', label: 'Foto',         icon: '◎' },
+  ];
+
   return (
-    <div style={{ ...css.app, padding: '20px 0 60px' }}>
-      <div style={css.container}>
-        <button onClick={() => onNavigate('home')} style={{ ...css.btn('ghost'), marginBottom: 24 }}>
-          {Icon.back} Zurück
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <style>{`
+        .gen-tab { transition: all 0.18s ease; }
+        .gen-tab:hover { border-color: ${C.indigo} !important; color: ${C.chalk} !important; }
+        .gen-chip { transition: all 0.15s ease; }
+        .gen-chip:hover { border-color: ${C.indigo}88 !important; color: ${C.chalk} !important; }
+        .drop-zone { transition: all 0.18s ease; }
+        .gen-btn-primary { transition: all 0.18s ease; }
+        .gen-btn-primary:hover:not(:disabled) { opacity: 0.88 !important; transform: translateY(-1px); }
+      `}</style>
+
+      {/* Page header — matches landing page style */}
+      <div style={{
+        padding: '40px 24px 0',
+        maxWidth: 720, margin: '0 auto', width: '100%',
+      }}>
+        <button
+          onClick={() => onNavigate('home')}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: C.muted, fontSize: 13, fontFamily: "'DM Mono', monospace",
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+            display: 'flex', alignItems: 'center', gap: 6, padding: 0,
+            marginBottom: 32,
+          }}
+        >
+          ← Startseite
         </button>
 
-        <h2 style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>Quiz generieren</h2>
-        <p style={{ color: C.muted, marginBottom: 24 }}>Wähle eine Quelle und pass das Quiz an.</p>
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 600,
+          letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase',
+          marginBottom: 10,
+        }}>
+          Quiz erstellen
+        </div>
+        <h1 style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
+          Wähle deine Quelle
+        </h1>
+        <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>
+          PDF, Foto oder ein Thema — die KI erstellt das Quiz.
+        </p>
 
-        {/* Source Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {[
-            { id: 'text',  icon: Icon.text,   label: 'Thema/Text' },
-            { id: 'pdf',   icon: Icon.pdf,    label: 'PDF' },
-            { id: 'image', icon: Icon.camera, label: 'Foto' },
-          ].map(s => (
+        {/* Source selector — pill tabs */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24,
+        }}>
+          {sources.map(s => (
             <button
               key={s.id}
+              className="gen-tab"
               onClick={() => { setSource(s.id); setFile(null); setError(''); }}
               style={{
-                ...css.btn(source === s.id ? 'primary' : 'ghost'),
-                flex: 1,
-                gap: 6,
-                padding: '10px 8px',
-                fontSize: 13,
+                background: source === s.id ? `${C.indigo}18` : 'transparent',
+                border: `1.5px solid ${source === s.id ? C.indigo : C.border}`,
+                borderRadius: 12, padding: '14px 12px',
+                cursor: 'pointer', color: source === s.id ? C.chalk : C.muted,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 600, fontSize: 14,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
               }}
             >
-              {s.icon} {s.label}
+              <span style={{
+                fontSize: 18, color: source === s.id ? C.indigo : C.muted,
+                fontFamily: "'DM Mono', monospace",
+              }}>{s.icon}</span>
+              {s.label}
             </button>
           ))}
         </div>
 
-        {/* Source Input */}
-        <div style={{ ...css.card, marginBottom: 16 }}>
+        {/* Input area */}
+        <div style={{
+          background: C.mid, border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: 24, marginBottom: 20,
+        }}>
           {source === 'text' && (
             <>
-              <label style={css.label}>Thema oder Text</label>
+              <label style={{
+                display: 'block', fontFamily: "'DM Mono', monospace",
+                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>
+                Thema oder Text
+              </label>
               <textarea
                 style={{
-                  ...css.input,
-                  minHeight: 120,
-                  resize: 'vertical',
-                  lineHeight: 1.6,
+                  width: '100%', background: C.light,
+                  border: `1px solid ${C.border}`, borderRadius: 10,
+                  padding: '14px 16px', color: C.chalk,
+                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 15,
+                  outline: 'none', resize: 'vertical', minHeight: 130, lineHeight: 1.6,
+                  boxSizing: 'border-box',
                 }}
-                placeholder="z.B. Die Französische Revolution, Photosynthese, Quadratische Gleichungen …"
+                placeholder="z. B. Die Weimarer Republik, Photosynthese, Satz des Pythagoras …"
                 value={topic}
                 onChange={e => { setTopic(e.target.value); setError(''); }}
               />
@@ -728,142 +754,196 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
 
           {(source === 'pdf' || source === 'image') && (
             <>
-              <label style={css.label}>
-                {source === 'pdf' ? 'PDF-Dokument hochladen' : 'Foto aufnehmen oder hochladen'}
+              <label style={{
+                display: 'block', fontFamily: "'DM Mono', monospace",
+                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>
+                {source === 'pdf' ? 'PDF hochladen' : 'Foto aufnehmen'}
               </label>
               <div
+                className="drop-zone"
                 onClick={() => fileRef.current?.click()}
-                onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={e => {
-                  e.preventDefault();
-                  setDragging(false);
-                  handleFileChange(e.dataTransfer.files[0]);
-                }}
+                onDragOver={e => { e.preventDefault(); }}
+                onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
                 style={{
-                  border: `2px dashed ${dragging ? C.indigo : file ? C.green : C.border}`,
-                  borderRadius: 12,
-                  padding: 32,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.15s, background 0.15s',
-                  background: dragging ? `${C.indigo}11` : file ? `${C.green}11` : 'transparent',
+                  border: `2px dashed ${file ? C.indigo : C.border}`,
+                  borderRadius: 12, padding: '36px 24px',
+                  textAlign: 'center', cursor: 'pointer',
+                  background: file ? `${C.indigo}0a` : 'transparent',
                 }}
               >
-                <div style={{ marginBottom: 12 }}>
-                  {file ? Icon.check : (source === 'pdf' ? Icon.pdf : Icon.camera)}
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  background: file ? `${C.indigo}20` : C.light,
+                  border: `1px solid ${file ? C.indigo : C.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px',
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: 20, color: file ? C.indigo : C.muted,
+                }}>
+                  {file ? '✓' : (source === 'pdf' ? '⬡' : '◎')}
                 </div>
-                <p style={{ fontWeight: 600, marginBottom: 4 }}>
+                <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: C.chalk }}>
                   {file ? file.name : (source === 'pdf' ? 'PDF hier ablegen oder antippen' : 'Foto aufnehmen oder auswählen')}
                 </p>
+                <p style={{ color: C.muted, fontSize: 13 }}>
+                  {file ? `${(file.size / 1024).toFixed(0)} KB` : (source === 'pdf' ? 'PDF bis 10 MB' : 'JPG, PNG, HEIC')}
+                </p>
                 {file && (
-                  <p style={{ color: C.muted, fontSize: 13 }}>
-                    {(file.size / 1024).toFixed(0)} KB
-                  </p>
-                )}
-                {!file && (
-                  <p style={{ color: C.muted, fontSize: 13 }}>
-                    {source === 'pdf' ? 'PDF-Dateien bis 10 MB' : 'JPG, PNG, HEIC'}
-                  </p>
+                  <button
+                    onClick={e => { e.stopPropagation(); setFile(null); }}
+                    style={{
+                      marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
+                      borderRadius: 8, padding: '4px 12px', color: C.muted,
+                      fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, cursor: 'pointer',
+                    }}
+                  >
+                    Entfernen
+                  </button>
                 )}
               </div>
               <input
-                ref={fileRef}
-                type="file"
+                ref={fileRef} type="file"
                 accept={source === 'pdf' ? 'application/pdf' : 'image/*'}
                 capture={source === 'image' ? 'environment' : undefined}
                 style={{ display: 'none' }}
                 onChange={e => handleFileChange(e.target.files[0])}
               />
-              {file && (
-                <button
-                  onClick={() => setFile(null)}
-                  style={{ ...css.btn('ghost'), fontSize: 12, marginTop: 10, padding: '6px 12px' }}
-                >
-                  Datei entfernen
-                </button>
-              )}
             </>
           )}
         </div>
 
         {/* Settings */}
-        <div style={{ ...css.card, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        <div style={{
+          background: C.mid, border: `1px solid ${C.border}`,
+          borderRadius: 16, padding: 24, marginBottom: 24,
+        }}>
+          {/* Count slider */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+              <label style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase',
+              }}>
+                Anzahl Fragen
+              </label>
+              <span style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 26,
+                fontWeight: 700, color: C.indigo,
+              }}>{count}</span>
+            </div>
+            <input
+              type="range" min={5} max={30} step={1} value={count}
+              onChange={e => setCount(Number(e.target.value))}
+              style={{ width: '100%', accentColor: C.indigo, cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: `${C.muted}88` }}>5</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: `${C.muted}88` }}>30</span>
+            </div>
+          </div>
+
+          {/* Difficulty + Level */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div>
-              <label style={css.label}>Anzahl Fragen</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input
-                  type="range"
-                  min={5} max={30} step={1}
-                  value={count}
-                  onChange={e => setCount(Number(e.target.value))}
-                  style={{ flex: 1, accentColor: C.indigo }}
-                />
-                <span style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: 20, fontWeight: 700,
-                  color: C.indigo, minWidth: 32, textAlign: 'right',
-                }}>
-                  {count}
-                </span>
+              <label style={{
+                display: 'block', fontFamily: "'DM Mono', monospace",
+                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>Schwierigkeit</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {['einfach', 'gemischt', 'schwer'].map(d => (
+                  <button
+                    key={d} className="gen-chip"
+                    onClick={() => setDifficulty(d)}
+                    style={{
+                      padding: '8px 14px', borderRadius: 8, textAlign: 'left',
+                      border: `1px solid ${difficulty === d ? C.indigo : C.border}`,
+                      background: difficulty === d ? `${C.indigo}18` : 'transparent',
+                      color: difficulty === d ? C.chalk : C.muted,
+                      cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >{d.charAt(0).toUpperCase() + d.slice(1)}</button>
+                ))}
               </div>
             </div>
             <div>
-              <label style={css.label}>Schwierigkeit</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {difficulties.map(d => (
-                  <button key={d} onClick={() => setDifficulty(d)} style={css.chip(difficulty === d)}>
-                    {d}
-                  </button>
+              <label style={{
+                display: 'block', fontFamily: "'DM Mono', monospace",
+                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+                textTransform: 'uppercase', marginBottom: 10,
+              }}>Sprachniveau</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {['Grundschule', 'Gymnasium', 'Universität'].map(l => (
+                  <button
+                    key={l} className="gen-chip"
+                    onClick={() => setLevel(l)}
+                    style={{
+                      padding: '8px 14px', borderRadius: 8, textAlign: 'left',
+                      border: `1px solid ${level === l ? C.indigo : C.border}`,
+                      background: level === l ? `${C.indigo}18` : 'transparent',
+                      color: level === l ? C.chalk : C.muted,
+                      cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >{l}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div>
-            <label style={css.label}>Sprachniveau</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {levels.map(l => (
-                <button key={l} onClick={() => setLevel(l)} style={css.chip(level === l)}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* Progress */}
+        {/* Progress bar */}
         {loading && (
-          <div style={{ marginBottom: 16 }}>
-            <ProgressBar value={progress} animated />
-            <p style={{ color: C.muted, fontSize: 13, marginTop: 8, textAlign: 'center' }}>
-              KI generiert {count} Fragen… Bitte warten.
-            </p>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', marginBottom: 8,
+              fontFamily: "'DM Mono', monospace", fontSize: 11,
+              color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em',
+            }}>
+              <span>KI generiert {count} Fragen</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div style={{ background: C.light, borderRadius: 100, height: 4, overflow: 'hidden' }}>
+              <div style={{
+                width: `${progress}%`, height: '100%',
+                background: `linear-gradient(90deg, ${C.indigo}, ${C.purple})`,
+                borderRadius: 100, transition: 'width 0.4s ease',
+              }} />
+            </div>
           </div>
         )}
 
+        {/* Error */}
         {error && (
           <div style={{
-            background: `${C.red}15`, border: `1px solid ${C.red}44`,
-            borderRadius: 10, padding: 14, marginBottom: 16, color: C.red, fontSize: 14,
+            background: `${C.red}12`, border: `1px solid ${C.red}44`,
+            borderRadius: 12, padding: '14px 18px', marginBottom: 20,
+            color: C.red, fontSize: 14,
           }}>
             {error}
           </div>
         )}
 
+        {/* Generate button */}
         <button
+          className="gen-btn-primary"
           onClick={handleGenerate}
           disabled={loading}
           style={{
-            ...css.btn('primary'),
-            width: '100%',
-            fontSize: 16,
-            padding: '14px 24px',
-            opacity: loading ? 0.6 : 1,
+            width: '100%', padding: '16px',
+            background: loading ? C.light : `linear-gradient(135deg, ${C.indigo} 0%, ${C.purple} 100%)`,
+            border: 'none', borderRadius: 14,
+            color: loading ? C.muted : 'white',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700, fontSize: 16,
             cursor: loading ? 'not-allowed' : 'pointer',
+            marginBottom: 48,
           }}
         >
-          {loading ? 'Generiere…' : `✨ ${count} Fragen generieren`}
+          {loading ? 'Generiere…' : `✦  ${count} Fragen generieren`}
         </button>
       </div>
     </div>
@@ -875,6 +955,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
   const stored = JSON.parse(sessionStorage.getItem('quizData') || '{}');
   const questions = (questionsProp && questionsProp.length > 0) ? questionsProp : (stored.questions || []);
   const opts = optsProp || stored.opts;
+
   const [pin, setPin] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [sharing, setSharing] = useState(false);
@@ -885,15 +966,10 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
   const [selectedFolder, setSelectedFolder] = useState('');
   const [newFolder, setNewFolder] = useState('');
 
-  useEffect(() => {
-    if (user && supabase) loadFolders();
-  }, [user]);
+  useEffect(() => { if (user && supabase) loadFolders(); }, [user]);
 
   const loadFolders = async () => {
-    const { data } = await supabase
-      .from('quiz_folders')
-      .select('*')
-      .order('name');
+    const { data } = await supabase.from('quiz_folders').select('*').order('name');
     if (data) setFolders(data);
   };
 
@@ -901,8 +977,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
     setSharing(true);
     try {
       const res = await fetch('/.netlify/functions/create-quiz-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questions, opts }),
       });
       const data = await res.json();
@@ -911,220 +986,234 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
       const appUrl = `${window.location.origin}?pin=${data.pin}`;
       setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(appUrl)}`);
       setShowShare(true);
-    } catch (e) {
-      showToast(e.message, 'error');
-    } finally {
-      setSharing(false);
-    }
+    } catch (e) { showToast(e.message, 'error'); }
+    finally { setSharing(false); }
   };
 
   const handleSave = async () => {
     if (!supabase || !user) return;
     let folderId = selectedFolder || null;
-
     if (newFolder.trim()) {
-      const { data } = await supabase
-        .from('quiz_folders')
-        .insert({ name: newFolder.trim(), user_id: user.id })
-        .select()
-        .single();
+      const { data } = await supabase.from('quiz_folders').insert({ name: newFolder.trim(), user_id: user.id }).select().single();
       if (data) folderId = data.id;
     }
-
-    const { error } = await supabase.from('saved_quizzes').insert({
-      user_id: user.id,
-      folder_id: folderId,
-      title: saveTitle,
-      questions,
-      opts,
-    });
-
-    if (error) {
-      showToast('Fehler beim Speichern', 'error');
-    } else {
-      showToast('Quiz gespeichert!', 'success');
-      setSaveModal(false);
-    }
+    const { error } = await supabase.from('saved_quizzes').insert({ user_id: user.id, folder_id: folderId, title: saveTitle, questions, opts });
+    if (error) showToast('Fehler beim Speichern', 'error');
+    else { showToast('Quiz gespeichert!', 'success'); setSaveModal(false); }
   };
 
+  const modes = [
+    {
+      id: 'beamer',
+      icon: '▣',
+      label: 'Gemeinsam am Bildschirm',
+      desc: 'Beamer oder Smartboard — alle sehen dieselbe Frage.',
+    },
+    {
+      id: 'solo',
+      icon: '◈',
+      label: 'Jeder für sich',
+      desc: 'Jeder Schüler spielt auf seinem eigenen Gerät.',
+    },
+  ];
+
   return (
-    <div style={{ ...css.app, padding: '20px 0 60px' }}>
-      <div style={css.container}>
-        <button onClick={() => onNavigate('generate')} style={{ ...css.btn('ghost'), marginBottom: 24 }}>
-          {Icon.back} Neues Quiz
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <style>{`
+        .mode-card { transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease; }
+        .mode-card:hover { border-color: ${C.indigo} !important; box-shadow: 0 8px 32px ${C.indigo}22 !important; transform: translateY(-2px); }
+        .share-btn { transition: all 0.15s ease; }
+        .share-btn:hover { border-color: ${C.indigo}88 !important; color: ${C.chalk} !important; }
+      `}</style>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 60px' }}>
+        {/* Back */}
+        <button
+          onClick={() => onNavigate('generate')}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: C.muted, fontSize: 13, fontFamily: "'DM Mono', monospace",
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+            display: 'flex', alignItems: 'center', gap: 6, padding: 0, marginBottom: 36,
+          }}
+        >
+          ← Neues Quiz
         </button>
 
-        {/* Summary */}
-        <div style={{ ...css.card, marginBottom: 20, background: `${C.indigo}15`, border: `1px solid ${C.indigo}33` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <h2 style={{ fontSize: 20, fontWeight: 700 }}>{opts?.topic || 'Quiz bereit!'}</h2>
-              <p style={{ color: C.muted, fontSize: 14, marginTop: 4 }}>
-                {questions.length} Fragen · {opts?.difficulty} · {opts?.level}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {user && (
-                <button onClick={() => setSaveModal(true)} style={{ ...css.btn('ghost'), padding: '8px 14px', fontSize: 13 }}>
-                  {Icon.save} Speichern
-                </button>
-              )}
+        {/* Quiz summary card */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
+          border: `1px solid ${C.border}`,
+          borderRadius: 20, padding: '28px 28px 24px',
+          marginBottom: 32,
+        }}>
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.14em', color: C.indigo,
+            textTransform: 'uppercase', marginBottom: 8,
+          }}>
+            Bereit
+          </div>
+          <h2 style={{ fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 700, marginBottom: 6, letterSpacing: '-0.01em' }}>
+            {opts?.topic || 'Quiz generiert'}
+          </h2>
+          <p style={{ color: C.muted, fontSize: 14, marginBottom: 20 }}>
+            {questions.length} Fragen · {opts?.difficulty} · {opts?.level}
+          </p>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              className="share-btn"
+              onClick={handleShare}
+              disabled={sharing}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`, borderRadius: 10,
+                padding: '9px 18px',
+                color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 600, fontSize: 13, cursor: sharing ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              ◈ {sharing ? 'Erstelle PIN…' : 'Per PIN teilen'}
+            </button>
+            {user && (
               <button
-                onClick={handleShare}
-                disabled={sharing}
-                style={{ ...css.btn('ghost'), padding: '8px 14px', fontSize: 13, opacity: sharing ? 0.6 : 1 }}
+                className="share-btn"
+                onClick={() => setSaveModal(true)}
+                style={{
+                  background: 'transparent',
+                  border: `1px solid ${C.border}`, borderRadius: 10,
+                  padding: '9px 18px',
+                  color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
               >
-                {Icon.share} {sharing ? 'Erstelle PIN…' : 'Teilen'}
+                ⬡ Speichern
               </button>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Share Modal */}
-        <Modal open={showShare} onClose={() => setShowShare(false)} title="Quiz teilen">
-          <div style={{ textAlign: 'center' }}>
-            {qrUrl && (
-              <img
-                src={qrUrl}
-                alt="QR-Code"
-                style={{ width: 180, height: 180, borderRadius: 12, margin: '0 auto 20px', display: 'block' }}
-              />
-            )}
-            <div style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 42, fontWeight: 700,
-              letterSpacing: 8, color: C.indigo,
-              marginBottom: 8,
-            }}>
-              {pin}
-            </div>
-            <p style={{ color: C.muted, fontSize: 14, marginBottom: 20 }}>
-              Schüler geben diesen PIN ein oder scannen den QR-Code.
-            </p>
-            <button onClick={() => setShowShare(false)} style={{ ...css.btn(), width: '100%' }}>
-              Schließen
-            </button>
-          </div>
-        </Modal>
+        {/* Mode selection */}
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 11,
+          letterSpacing: '0.14em', color: C.muted,
+          textTransform: 'uppercase', marginBottom: 16,
+        }}>
+          Spielmodus wählen
+        </div>
 
-        {/* Save Modal */}
-        <Modal open={saveModal} onClose={() => setSaveModal(false)} title="Quiz speichern">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={css.label}>Titel</label>
-              <input
-                style={css.input}
-                value={saveTitle}
-                onChange={e => setSaveTitle(e.target.value)}
-              />
-            </div>
-            {folders.length > 0 && (
-              <div>
-                <label style={css.label}>Ordner</label>
-                <select
-                  style={{ ...css.input }}
-                  value={selectedFolder}
-                  onChange={e => setSelectedFolder(e.target.value)}
-                >
-                  <option value="">Kein Ordner</option>
-                  {folders.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div>
-              <label style={css.label}>Neuer Ordner (optional)</label>
-              <input
-                style={css.input}
-                placeholder="z.B. Klasse 8a – Biologie"
-                value={newFolder}
-                onChange={e => setNewFolder(e.target.value)}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setSaveModal(false)} style={{ ...css.btn('ghost'), flex: 1 }}>
-                Abbrechen
-              </button>
-              <button onClick={handleSave} style={{ ...css.btn(), flex: 1 }}>
-                Speichern
-              </button>
-            </div>
-          </div>
-        </Modal>
-
-        {/* Mode Selection */}
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Spielmodus wählen</h3>
-        <div style={{ display: 'grid', gap: 12 }}>
-          {[
-            {
-              mode: 'beamer',
-              icon: '🖥️',
-              title: 'Gemeinsam am Bildschirm',
-              desc: 'Beamer oder Smartboard — alle sehen die gleiche Frage.',
-              color: C.indigo,
-            },
-            {
-              mode: 'solo',
-              icon: '📱',
-              title: 'Jeder für sich',
-              desc: 'Jeder Schüler spielt auf seinem eigenen Gerät.',
-              color: C.teal,
-            },
-          ].map(option => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {modes.map(m => (
             <button
-              key={option.mode}
-              onClick={() => onStartQuiz(questions, option.mode, opts)}
+              key={m.id}
+              className="mode-card"
+              onClick={() => onStartQuiz(questions, m.id, opts)}
               style={{
-                ...css.card,
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 20,
+                background: C.mid,
                 border: `1px solid ${C.border}`,
-                transition: 'border-color 0.15s, transform 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = option.color;
-                e.currentTarget.style.transform = 'translateX(4px)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = C.border;
-                e.currentTarget.style.transform = 'none';
+                borderRadius: 16, padding: '22px 24px',
+                cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 20,
               }}
             >
-              <div style={{ fontSize: 36 }}>{option.icon}</div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{option.title}</div>
-                <div style={{ color: C.muted, fontSize: 14 }}>{option.desc}</div>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                background: `${C.indigo}18`, border: `1px solid ${C.indigo}33`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: "'DM Mono', monospace", fontSize: 22, color: C.indigo,
+              }}>
+                {m.icon}
               </div>
-              <div style={{ marginLeft: 'auto', color: C.muted }}>→</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, color: C.chalk }}>{m.label}</div>
+                <div style={{ color: C.muted, fontSize: 13 }}>{m.desc}</div>
+              </div>
+              <div style={{
+                fontFamily: "'DM Mono', monospace",
+                color: C.muted, fontSize: 18, flexShrink: 0,
+              }}>→</div>
             </button>
           ))}
         </div>
       </div>
+
+      {/* Share Modal */}
+      <Modal open={showShare} onClose={() => setShowShare(false)} title="Quiz teilen">
+        <div style={{ textAlign: 'center' }}>
+          {qrUrl && (
+            <img src={qrUrl} alt="QR-Code" style={{
+              width: 160, height: 160, borderRadius: 12,
+              margin: '0 auto 20px', display: 'block',
+              border: `1px solid ${C.border}`,
+            }} />
+          )}
+          <div style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 44, fontWeight: 700, letterSpacing: 10,
+            color: C.indigo, marginBottom: 8,
+          }}>
+            {pin}
+          </div>
+          <p style={{ color: C.muted, fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+            Schüler geben diesen PIN ein oder scannen den QR-Code.
+          </p>
+          <button
+            onClick={() => setShowShare(false)}
+            style={{
+              width: '100%', background: C.indigo, border: 'none',
+              borderRadius: 12, padding: '13px', color: 'white',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+              fontSize: 15, cursor: 'pointer',
+            }}
+          >
+            Schließen
+          </button>
+        </div>
+      </Modal>
+
+      {/* Save Modal */}
+      <Modal open={saveModal} onClose={() => setSaveModal(false)} title="Quiz speichern">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={{ ...css.label }}>Titel</label>
+            <input style={css.input} value={saveTitle} onChange={e => setSaveTitle(e.target.value)} />
+          </div>
+          {folders.length > 0 && (
+            <div>
+              <label style={css.label}>Ordner</label>
+              <select style={css.input} value={selectedFolder} onChange={e => setSelectedFolder(e.target.value)}>
+                <option value="">Kein Ordner</option>
+                {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+          )}
+          <div>
+            <label style={css.label}>Neuer Ordner (optional)</label>
+            <input style={css.input} placeholder="z. B. Klasse 8a – Biologie" value={newFolder} onChange={e => setNewFolder(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setSaveModal(false)} style={{ ...css.btn('ghost'), flex: 1 }}>Abbrechen</button>
+            <button onClick={handleSave} style={{ ...css.btn(), flex: 1 }}>Speichern</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
 
 // ─── SCREEN: Quiz Play ────────────────────────────────────────────────────────
-// Answer option colors like Kahoot
-const ANSWER_COLORS = [
-  { bg: '#E21B3C', light: '#FF2745' }, // A - Red
-  { bg: '#1368CE', light: '#1E7FFF' }, // B - Blue
-  { bg: '#D89E00', light: '#FFB800' }, // C - Yellow
-  { bg: '#26890C', light: '#2DAD0F' }, // D - Green
-];
-
 function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsProp, onNavigate, showToast }) {
-  // Ultimate fallback: read from sessionStorage if props are empty
   const stored = JSON.parse(sessionStorage.getItem('quizPlay') || '{}');
   const questions = (questionsProp && questionsProp.length > 0)
     ? questionsProp
     : (stored.questions && stored.questions.length > 0 ? stored.questions : []);
   const mode = modeProp || stored.mode;
   const opts = optsProp || stored.opts;
+
   const shuffled = useRef(questions.map(shuffleAnswers));
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -1133,20 +1222,27 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
   const [done, setDone] = useState(false);
   const [exitModal, setExitModal] = useState(false);
 
-  // Guard: no questions loaded
+  // Guard — no questions
   if (!questions || questions.length === 0) {
     return (
       <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 20, padding: 40, maxWidth: 440, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <h2 style={{ color: C.chalk, fontSize: 22, fontWeight: 700, marginBottom: 12 }}>Keine Fragen geladen</h2>
-          <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
-            Bei PDF-Dokumenten kann die Generierung von 10+ Fragen etwas länger dauern.
-            Bitte geh zurück und versuche es mit <strong style={{ color: C.chalk }}>5 Fragen</strong> oder einem <strong style={{ color: C.chalk }}>kürzeren Thema als Text</strong>.
+        <div style={{
+          background: C.mid, border: `1px solid ${C.border}`,
+          borderRadius: 20, padding: 40, maxWidth: 440, width: '100%', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⚠</div>
+          <h2 style={{ color: C.chalk, fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Keine Fragen geladen</h2>
+          <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+            Bitte geh zurück und versuche es mit weniger Fragen oder einem Thema als Text.
           </p>
           <button
             onClick={() => onNavigate('generate')}
-            style={{ background: C.indigo, border: 'none', borderRadius: 12, padding: '14px 28px', color: 'white', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer', width: '100%' }}
+            style={{
+              width: '100%', background: C.indigo, border: 'none',
+              borderRadius: 12, padding: '14px', color: 'white',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+              fontSize: 15, cursor: 'pointer',
+            }}
           >
             ← Zurück zur Generierung
           </button>
@@ -1168,53 +1264,75 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
   };
 
   const handleNext = () => {
-    if (current + 1 >= total) {
-      setDone(true);
-    } else {
-      setCurrent(c => c + 1);
-      setSelected(null);
-    }
+    if (current + 1 >= total) setDone(true);
+    else { setCurrent(c => c + 1); setSelected(null); }
   };
 
-  // ── Results Screen ──────────────────────────────────────────────────────────
+  // ── Results ────────────────────────────────────────────────────────────────
   if (done) {
     const pct = Math.round((score / total) * 100);
-    const grade = pct >= 90 ? '🏆 Ausgezeichnet!' : pct >= 70 ? '🎉 Gut gemacht!' : pct >= 50 ? '💪 Weiter üben!' : '📚 Nicht aufgeben!';
+    const grade = pct >= 90 ? 'Ausgezeichnet' : pct >= 70 ? 'Gut gemacht' : pct >= 50 ? 'Weiter üben' : 'Nicht aufgeben';
     const scoreColor = pct >= 70 ? C.green : pct >= 50 ? C.amber : C.red;
     return (
       <div style={{ ...css.app, minHeight: '100vh' }}>
-        <style>{`
-          @media (max-width: 600px) { .result-grid { grid-template-columns: 1fr !important; } }
-        `}</style>
-        {/* Hero result banner */}
+        {/* Result hero */}
         <div style={{
-          background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
+          background: `linear-gradient(160deg, ${C.mid} 0%, ${C.light} 100%)`,
           borderBottom: `1px solid ${C.border}`,
-          padding: '40px 24px 32px',
+          padding: '52px 24px 40px',
           textAlign: 'center',
         }}>
-          <div style={{ marginBottom: 12 }}>{Icon.trophy}</div>
-          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>{grade}</h2>
           <div style={{
-            display: 'inline-flex', alignItems: 'baseline', gap: 8,
-            background: `${scoreColor}1a`, border: `2px solid ${scoreColor}`,
-            borderRadius: 20, padding: '12px 32px', marginBottom: 16,
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.14em', color: C.muted,
+            textTransform: 'uppercase', marginBottom: 20,
+          }}>
+            Ergebnis
+          </div>
+          {/* Big score */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'baseline', gap: 4,
+            marginBottom: 16,
           }}>
             <span style={{
-              fontSize: 64, fontWeight: 700, color: scoreColor,
-              fontFamily: "'DM Mono', monospace", lineHeight: 1,
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 'clamp(72px, 12vw, 96px)',
+              fontWeight: 700, color: scoreColor, lineHeight: 1,
+              letterSpacing: '-0.03em',
             }}>{pct}</span>
-            <span style={{ fontSize: 28, color: scoreColor, fontWeight: 700 }}>%</span>
+            <span style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 'clamp(28px, 5vw, 36px)',
+              fontWeight: 700, color: scoreColor,
+            }}>%</span>
           </div>
-          <p style={{ color: C.muted, fontSize: 16, marginBottom: 20 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: C.chalk }}>
+            {grade}
+          </h2>
+          <p style={{ color: C.muted, fontSize: 15, marginBottom: 24 }}>
             {score} von {total} Fragen richtig
           </p>
-          <div style={{ maxWidth: 400, margin: '0 auto 24px' }}>
-            <ProgressBar value={pct} color={scoreColor} height={10} animated />
+          {/* Score bar */}
+          <div style={{ maxWidth: 360, margin: '0 auto 32px' }}>
+            <div style={{ background: C.light, borderRadius: 100, height: 6, overflow: 'hidden' }}>
+              <div style={{
+                width: `${pct}%`, height: '100%',
+                background: scoreColor,
+                borderRadius: 100, transition: 'width 0.8s ease',
+              }} />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => onNavigate('home')} style={{ ...css.btn('ghost'), minWidth: 140 }}>
-              Zur Startseite
+            <button
+              onClick={() => onNavigate('home')}
+              style={{
+                background: 'transparent', border: `1px solid ${C.border}`,
+                borderRadius: 12, padding: '12px 24px',
+                color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 600, fontSize: 14, cursor: 'pointer', minWidth: 140,
+              }}
+            >
+              Startseite
             </button>
             <button
               onClick={() => {
@@ -1222,7 +1340,12 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
                 setResults([]); setDone(false);
                 shuffled.current = questions.map(shuffleAnswers);
               }}
-              style={{ ...css.btn('primary'), minWidth: 140 }}
+              style={{
+                background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                border: 'none', borderRadius: 12, padding: '12px 24px',
+                color: 'white', fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700, fontSize: 14, cursor: 'pointer', minWidth: 140,
+              }}
             >
               Wiederholen
             </button>
@@ -1230,22 +1353,37 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
         </div>
 
         {/* Question review */}
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 24px 60px' }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: C.muted, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '36px 24px 60px' }}>
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.14em', color: C.muted,
+            textTransform: 'uppercase', marginBottom: 20,
+          }}>
             Fragenübersicht
-          </h3>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {results.map((r, i) => (
               <div key={i} style={{
-                background: r.correct ? `${C.green}0f` : `${C.red}0f`,
-                border: `1px solid ${r.correct ? C.green : C.red}44`,
-                borderRadius: 14, padding: '16px 18px',
+                background: r.correct ? `${C.green}0c` : `${C.red}0c`,
+                border: `1px solid ${r.correct ? C.green : C.red}33`,
+                borderRadius: 14, padding: '16px 20px',
                 display: 'flex', gap: 14, alignItems: 'flex-start',
               }}>
-                <div style={{ flexShrink: 0, marginTop: 2 }}>{r.correct ? Icon.check : Icon.wrong}</div>
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                  background: r.correct ? C.green : C.red,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700, color: 'white',
+                }}>
+                  {r.correct ? '✓' : '✗'}
+                </div>
                 <div>
-                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, lineHeight: 1.4 }}>{r.question}</p>
-                  <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>{r.explanation}</p>
+                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, lineHeight: 1.4, color: C.chalk }}>
+                    {r.question}
+                  </p>
+                  <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+                    {r.explanation}
+                  </p>
                 </div>
               </div>
             ))}
@@ -1255,36 +1393,21 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
     );
   }
 
-  // ── Quiz Play Screen ────────────────────────────────────────────────────────
-  const progressPct = (current / total) * 100;
-
+  // ── Active Quiz ────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      ...css.app,
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div style={{ ...css.app, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>{`
-        @media (max-width: 600px) {
-          .answer-grid { grid-template-columns: 1fr !important; }
-        }
-        .answer-btn { transition: transform 0.12s ease, opacity 0.2s ease !important; }
-        .answer-btn:hover:not(:disabled) { transform: scale(1.02) !important; }
-        .answer-btn:active:not(:disabled) { transform: scale(0.98) !important; }
+        @media (max-width: 580px) { .opt-grid { grid-template-columns: 1fr !important; } }
+        .opt-btn { transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease; }
+        .opt-btn:hover:not(:disabled) { transform: translateY(-2px); }
       `}</style>
 
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div style={{
-        background: C.mid,
-        borderBottom: `1px solid ${C.border}`,
-        padding: '0 20px',
-        height: 56,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16,
-        position: 'sticky', top: 0, zIndex: 100,
-        flexShrink: 0,
+        background: C.mid, borderBottom: `1px solid ${C.border}`,
+        padding: '0 20px', height: 56,
+        display: 'flex', alignItems: 'center', gap: 16,
+        position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
       }}>
         <button
           onClick={() => setExitModal(true)}
@@ -1296,186 +1419,152 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
           }}
         >✕</button>
 
-        {/* Progress bar */}
-        <div style={{ flex: 1, position: 'relative' }}>
-          <div style={{ background: C.light, borderRadius: 100, height: 8, overflow: 'hidden' }}>
+        {/* Progress */}
+        <div style={{ flex: 1 }}>
+          <div style={{ background: C.light, borderRadius: 100, height: 4, overflow: 'hidden' }}>
             <div style={{
-              width: `${progressPct}%`, height: '100%',
+              width: `${(current / total) * 100}%`, height: '100%',
               background: `linear-gradient(90deg, ${C.indigo}, ${C.purple})`,
               borderRadius: 100, transition: 'width 0.4s ease',
             }} />
           </div>
         </div>
 
-        {/* Counter */}
         <div style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 13,
+          fontFamily: "'DM Mono', monospace", fontSize: 12,
           color: C.muted, flexShrink: 0,
         }}>
           {current + 1} / {total}
         </div>
 
-        {/* Score */}
         <div style={{
-          background: `${C.amber}20`, border: `1px solid ${C.amber}50`,
-          borderRadius: 100, padding: '4px 14px',
+          background: `${C.amber}18`, border: `1px solid ${C.amber}44`,
+          borderRadius: 100, padding: '4px 12px',
           fontFamily: "'DM Mono', monospace",
-          fontSize: 14, color: C.amber, fontWeight: 700, flexShrink: 0,
+          fontSize: 13, color: C.amber, fontWeight: 700, flexShrink: 0,
         }}>
           {score} ★
         </div>
       </div>
 
-      {/* ── Question area ── */}
+      {/* Content */}
       <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        maxWidth: 860,
-        width: '100%',
-        margin: '0 auto',
-        padding: '28px 20px 32px',
-        gap: 24,
+        flex: 1, maxWidth: 800, width: '100%',
+        margin: '0 auto', padding: '32px 20px 40px',
+        display: 'flex', flexDirection: 'column', gap: 20,
       }}>
 
-        {/* Question card */}
+        {/* Question */}
         <div style={{
           background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
           border: `1px solid ${C.border}`,
-          borderRadius: 20,
-          padding: '28px 28px 24px',
+          borderRadius: 20, padding: '28px 28px 24px',
           textAlign: 'center',
-          boxShadow: `0 4px 24px #00000033`,
         }}>
           <div style={{
             display: 'inline-block',
             fontFamily: "'DM Mono', monospace",
-            fontSize: 11, fontWeight: 600,
-            color: C.indigo,
-            background: `${C.indigo}1a`,
-            border: `1px solid ${C.indigo}33`,
-            borderRadius: 100,
-            padding: '4px 14px',
-            marginBottom: 16,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
+            fontSize: 11, color: C.indigo,
+            background: `${C.indigo}18`, border: `1px solid ${C.indigo}30`,
+            borderRadius: 100, padding: '4px 14px',
+            letterSpacing: '0.1em', textTransform: 'uppercase',
+            marginBottom: 18,
           }}>
             Frage {current + 1}
           </div>
           <p style={{
-            fontSize: 'clamp(17px, 3vw, 22px)',
-            fontWeight: 700,
-            lineHeight: 1.45,
-            color: C.chalk,
+            fontSize: 'clamp(17px, 2.5vw, 22px)',
+            fontWeight: 700, lineHeight: 1.45, color: C.chalk,
           }}>
             {q.question}
           </p>
         </div>
 
-        {/* ── Answer grid (2x2 like Kahoot) ── */}
-        <div
-          className="answer-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 14,
-          }}
-        >
+        {/* Answer grid 2×2 */}
+        <div className="opt-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {q.shuffledOptions.map((opt, i) => {
             const isSelected = selected === i;
-            const isCorrect = i === q.shuffledCorrect;
+            const isCorrect  = i === q.shuffledCorrect;
             const showResult = selected !== null;
-            const color = ANSWER_COLORS[i];
 
-            // Determine visual state
-            let opacity = 1;
-            let borderColor = 'transparent';
-            let bgColor = color.bg;
-            let extraStyle = {};
+            let bg     = C.mid;
+            let border = C.border;
 
             if (showResult) {
-              if (isCorrect) {
-                borderColor = '#fff';
-                bgColor = color.bg;
-                extraStyle = { boxShadow: `0 0 0 3px white, 0 8px 32px ${color.bg}88` };
-              } else if (isSelected && !isCorrect) {
-                opacity = 0.55;
-              } else if (!isCorrect) {
-                opacity = 0.35;
-              }
+              if (isCorrect)               { bg = `${C.green}18`; border = C.green; }
+              else if (isSelected)         { bg = `${C.red}18`;   border = C.red; }
+              else                         { bg = C.mid; border = `${C.border}88`; }
+            } else if (isSelected) {
+              bg = `${C.indigo}18`; border = C.indigo;
             }
 
             return (
               <button
                 key={i}
-                className="answer-btn"
+                className="opt-btn"
                 onClick={() => handleSelect(i)}
                 disabled={selected !== null}
                 style={{
-                  background: bgColor,
-                  border: `3px solid ${borderColor}`,
-                  borderRadius: 16,
-                  padding: '18px 16px',
+                  background: bg,
+                  border: `1.5px solid ${border}`,
+                  borderRadius: 14, padding: '18px 18px',
                   cursor: selected !== null ? 'default' : 'pointer',
-                  textAlign: 'left',
-                  color: 'white',
+                  textAlign: 'left', color: C.chalk,
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontWeight: 700,
-                  opacity,
-                  minHeight: 90,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 14,
-                  boxShadow: showResult && isCorrect ? extraStyle.boxShadow : `0 4px 16px ${color.bg}55`,
-                  ...extraStyle,
+                  fontWeight: 500, minHeight: 86,
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  opacity: (showResult && !isCorrect && !isSelected) ? 0.45 : 1,
                 }}
               >
-                {/* Letter badge */}
+                {/* Label badge */}
                 <span style={{
-                  width: 36, height: 36,
-                  borderRadius: 10,
-                  background: 'rgba(0,0,0,0.25)',
+                  width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                  background: showResult && isCorrect ? `${C.green}30`
+                            : showResult && isSelected ? `${C.red}30`
+                            : `${C.indigo}20`,
+                  border: `1px solid ${
+                    showResult && isCorrect ? C.green
+                    : showResult && isSelected ? C.red
+                    : `${C.indigo}44`}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: "'DM Mono', monospace",
-                  fontWeight: 700, fontSize: 15,
-                  flexShrink: 0,
+                  fontWeight: 700, fontSize: 13,
+                  color: showResult && isCorrect ? C.green
+                       : showResult && isSelected ? C.red
+                       : C.indigo,
                 }}>
                   {LABELS[i]}
                 </span>
 
-                {/* Answer text */}
-                <span style={{ fontSize: 'clamp(13px, 2vw, 15px)', lineHeight: 1.4, flex: 1 }}>
+                <span style={{ fontSize: 'clamp(13px, 1.8vw, 15px)', lineHeight: 1.4, flex: 1 }}>
                   {opt.text}
                 </span>
 
-                {/* Result icon */}
                 {showResult && isCorrect && (
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>✓</span>
+                  <span style={{ color: C.green, fontSize: 18, flexShrink: 0 }}>✓</span>
                 )}
                 {showResult && isSelected && !isCorrect && (
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>✗</span>
+                  <span style={{ color: C.red, fontSize: 18, flexShrink: 0 }}>✗</span>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Explanation after answer */}
+        {/* Explanation */}
         {selected !== null && (
           <div style={{
-            background: `${C.indigo}18`,
-            border: `1px solid ${C.indigo}44`,
-            borderRadius: 14,
-            padding: '18px 20px',
+            background: `${C.indigo}10`,
+            border: `1px solid ${C.indigo}30`,
+            borderRadius: 14, padding: '18px 20px',
           }}>
-            <p style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: 11, color: C.indigo,
-              textTransform: 'uppercase', letterSpacing: '0.08em',
-              marginBottom: 8,
+            <div style={{
+              fontFamily: "'DM Mono', monospace", fontSize: 10,
+              letterSpacing: '0.14em', color: C.indigo,
+              textTransform: 'uppercase', marginBottom: 8,
             }}>
               Erklärung
-            </p>
+            </div>
             <p style={{ color: C.chalk, fontSize: 15, lineHeight: 1.6 }}>
               {q.explanation}
             </p>
@@ -1487,33 +1576,28 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
           <button
             onClick={handleNext}
             style={{
-              ...css.btn('primary'),
-              width: '100%',
-              fontSize: 16,
-              padding: '16px',
-              borderRadius: 14,
+              width: '100%', padding: '16px', border: 'none', borderRadius: 14,
               background: current + 1 >= total
-                ? `linear-gradient(135deg, ${C.amber}, #FF8C00)`
-                : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                ? `linear-gradient(135deg, ${C.amber} 0%, #FF9500 100%)`
+                : `linear-gradient(135deg, ${C.indigo} 0%, ${C.purple} 100%)`,
+              color: 'white',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700, fontSize: 16, cursor: 'pointer',
             }}
           >
-            {current + 1 >= total ? '🏆 Ergebnis anzeigen' : 'Nächste Frage →'}
+            {current + 1 >= total ? '✦  Ergebnis anzeigen' : 'Nächste Frage  →'}
           </button>
         )}
       </div>
 
       {/* Exit Modal */}
       <Modal open={exitModal} onClose={() => setExitModal(false)} title="Quiz verlassen?">
-        <p style={{ color: C.muted, marginBottom: 20 }}>
+        <p style={{ color: C.muted, marginBottom: 20, lineHeight: 1.6 }}>
           Dein Fortschritt geht verloren.
         </p>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => setExitModal(false)} style={{ ...css.btn('ghost'), flex: 1 }}>
-            Weitermachen
-          </button>
-          <button onClick={() => onNavigate('home')} style={{ ...css.btn('danger'), flex: 1 }}>
-            Verlassen
-          </button>
+          <button onClick={() => setExitModal(false)} style={{ ...css.btn('ghost'), flex: 1 }}>Weitermachen</button>
+          <button onClick={() => onNavigate('home')} style={{ ...css.btn('danger'), flex: 1 }}>Verlassen</button>
         </div>
       </Modal>
     </div>
