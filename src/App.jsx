@@ -554,6 +554,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const [count, setCount] = useState(10);
   const [difficulty, setDifficulty] = useState('gemischt');
   const [level, setLevel] = useState('Sekundarstufe 1');
+  const [withImages, setWithImages] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
@@ -571,10 +572,10 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const startProgress = () => {
     setProgress(5); let val = 5;
     intervalRef.current = setInterval(() => {
-      val += Math.random() * 8;
+      val += Math.random() * 6;
       if (val >= 88) { clearInterval(intervalRef.current); val = 88; }
       setProgress(val);
-    }, 600);
+    }, 700);
   };
 
   const stopProgress = () => {
@@ -588,7 +589,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
     if ((source === 'pdf' || source === 'image') && !file) { setError('Bitte wähle eine Datei aus.'); return; }
     setLoading(true); setError(''); startProgress();
     try {
-      let body = { source, count, difficulty, level };
+      let body = { source, count, difficulty, level, withImages };
       if (file) {
         const b64 = await toBase64(file);
         body.imageData = b64; body.imageType = file.type;
@@ -619,7 +620,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
         }
       }
       stopProgress();
-      onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert' });
+      onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert', withImages });
     } catch (e) { stopProgress(); setError(e.message); }
     finally { setLoading(false); }
   };
@@ -633,93 +634,89 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const selStyle = {
     width: '100%', appearance: 'none', WebkitAppearance: 'none',
     background: C.navy, border: `1px solid ${C.border}`,
-    borderRadius: 8, padding: '9px 32px 9px 12px',
+    borderRadius: 8, padding: '10px 32px 10px 12px',
     color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
-    fontSize: 13, fontWeight: 500, cursor: 'pointer', outline: 'none',
+    fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none',
+  };
+
+  const labelStyle = {
+    display: 'block', fontFamily: "'DM Mono', monospace",
+    fontSize: 10, letterSpacing: '0.14em', color: C.muted,
+    textTransform: 'uppercase', marginBottom: 8,
   };
 
   return (
     <div style={{ ...css.app, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .gen-src { transition: all 0.16s ease; }
-        .gen-src:hover { border-color: ${C.indigo} !important; background: ${C.indigo}12 !important; }
-        .gen-src:hover .gen-src-icon { color: ${C.indigo} !important; }
-        .gen-src:hover .gen-src-label { color: ${C.chalk} !important; }
+        .gen-src:hover { border-color: ${C.indigo} !important; background: ${C.indigo}14 !important; transform: translateY(-2px); box-shadow: 0 6px 20px ${C.indigo}22 !important; }
+        .gen-src:hover .src-icon { color: ${C.indigo} !important; }
+        .gen-src:hover .src-label { color: ${C.chalk} !important; }
+        .drop-zone { transition: all 0.16s ease; }
         .drop-zone:hover { border-color: ${C.indigo} !important; background: ${C.indigo}0a !important; }
-        .gen-go:hover:not(:disabled) { opacity: 0.88 !important; transform: translateY(-1px) !important; }
-        select option { background: ${C.mid}; }
+        .gen-go { transition: all 0.18s ease; }
+        .gen-go:hover:not(:disabled) { opacity: 0.88 !important; transform: translateY(-2px) !important; box-shadow: 0 8px 28px ${C.indigo}44 !important; }
+        .img-toggle:hover { border-color: ${C.indigo}88 !important; }
       `}</style>
 
-      <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', padding: '28px 20px 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', padding: '24px 20px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* Back + eyebrow */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <button onClick={() => onNavigate('home')} style={{
             background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
-            fontSize: 12, fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em',
-            textTransform: 'uppercase', padding: 0,
+            fontSize: 11, fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em',
+            textTransform: 'uppercase', padding: 0, display: 'flex', alignItems: 'center', gap: 4,
           }}>← Zurück</button>
-          <div style={{ width: 1, height: 14, background: C.border }} />
+          <div style={{ width: 1, height: 12, background: C.border }} />
           <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", letterSpacing: '0.14em', color: C.indigo, textTransform: 'uppercase' }}>
             Quiz erstellen
           </div>
         </div>
 
-        {/* Source selector — horizontal, compact */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+        {/* Source tabs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {sources.map(s => (
-            <button
-              key={s.id}
-              className="gen-src"
+            <button key={s.id} className="gen-src"
               onClick={() => { setSource(s.id); setFile(null); setError(''); }}
               style={{
                 background: source === s.id ? `${C.indigo}18` : C.mid,
                 border: `1.5px solid ${source === s.id ? C.indigo : C.border}`,
-                borderRadius: 12, padding: '12px 10px',
+                borderRadius: 12, padding: '14px 10px',
                 cursor: 'pointer', textAlign: 'center',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
                 boxShadow: source === s.id ? `0 4px 20px ${C.indigo}28` : 'none',
+                transition: 'all 0.16s ease',
               }}
             >
-              <span className="gen-src-icon" style={{
-                fontSize: 20, lineHeight: 1,
-                fontFamily: "'DM Mono', monospace",
-                color: source === s.id ? C.indigo : C.muted,
+              <span className="src-icon" style={{
+                fontSize: 22, fontFamily: "'DM Mono', monospace",
+                color: source === s.id ? C.indigo : C.muted, lineHeight: 1,
                 transition: 'color 0.16s',
               }}>{s.icon}</span>
-              <span className="gen-src-label" style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 700, fontSize: 13,
-                color: source === s.id ? C.chalk : C.muted,
-                transition: 'color 0.16s',
+              <span className="src-label" style={{
+                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13,
+                color: source === s.id ? C.chalk : C.muted, transition: 'color 0.16s',
               }}>{s.label}</span>
               <span style={{
-                fontSize: 11, color: source === s.id ? `${C.indigo}cc` : `${C.muted}88`,
-                fontFamily: "'DM Mono', monospace",
+                fontSize: 11, fontFamily: "'DM Mono', monospace",
+                color: source === s.id ? `${C.indigo}bb` : `${C.muted}77`,
               }}>{s.desc}</span>
             </button>
           ))}
         </div>
 
-        {/* Main card */}
-        <div style={{
-          background: C.mid, border: `1px solid ${C.border}`,
-          borderRadius: 16, padding: '18px 20px', marginBottom: 10, flex: 1,
-        }}>
-
-          {/* Text input */}
+        {/* Input card */}
+        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 18px' }}>
           {source === 'text' && (
             <>
-              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.14em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>
-                Thema oder Text
-              </label>
+              <label style={labelStyle}>Thema oder Text</label>
               <textarea
                 style={{
-                  width: '100%', background: C.navy,
-                  border: `1px solid ${C.border}`, borderRadius: 10,
-                  padding: '12px 14px', color: C.chalk,
+                  width: '100%', background: C.navy, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: '12px 14px', color: C.chalk,
                   fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
-                  outline: 'none', resize: 'none', height: 90, lineHeight: 1.6,
+                  outline: 'none', resize: 'none', height: 110, lineHeight: 1.6,
                   boxSizing: 'border-box',
                 }}
                 placeholder="z. B. Die Weimarer Republik, Photosynthese, Satz des Pythagoras …"
@@ -728,25 +725,18 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
               />
             </>
           )}
-
-          {/* File drop zone */}
           {(source === 'pdf' || source === 'image') && (
             <>
-              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.14em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>
-                {source === 'pdf' ? 'PDF hochladen' : 'Foto aufnehmen'}
-              </label>
-              <div
-                className="drop-zone"
+              <label style={labelStyle}>{source === 'pdf' ? 'PDF hochladen' : 'Foto aufnehmen'}</label>
+              <div className="drop-zone"
                 onClick={() => fileRef.current?.click()}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
                 style={{
-                  border: `2px dashed ${file ? C.indigo : C.border}`,
-                  borderRadius: 10, padding: '20px 16px',
-                  textAlign: 'center', cursor: 'pointer',
+                  border: `2px dashed ${file ? C.indigo : C.border}`, borderRadius: 10,
+                  padding: '18px 16px', cursor: 'pointer',
                   background: file ? `${C.indigo}0a` : 'transparent',
-                  transition: 'all 0.16s ease',
-                  display: 'flex', alignItems: 'center', gap: 16,
+                  display: 'flex', alignItems: 'center', gap: 14,
                 }}
               >
                 <div style={{
@@ -759,7 +749,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
                 }}>
                   {file ? '✓' : (source === 'pdf' ? '⬡' : '◎')}
                 </div>
-                <div style={{ textAlign: 'left', flex: 1 }}>
+                <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, color: C.chalk }}>
                     {file ? file.name : (source === 'pdf' ? 'PDF ablegen oder antippen' : 'Foto aufnehmen oder auswählen')}
                   </p>
@@ -770,8 +760,8 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
                 {file && (
                   <button onClick={e => { e.stopPropagation(); setFile(null); }} style={{
                     background: 'none', border: `1px solid ${C.border}`, borderRadius: 6,
-                    padding: '4px 10px', color: C.muted,
-                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, cursor: 'pointer', flexShrink: 0,
+                    padding: '4px 10px', color: C.muted, fontSize: 11, cursor: 'pointer', flexShrink: 0,
+                    fontFamily: "'Space Grotesk', sans-serif",
                   }}>✕</button>
                 )}
               </div>
@@ -783,32 +773,30 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
               />
             </>
           )}
+        </div>
 
-          {/* Settings row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 16 }}>
-            {/* Count */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase' }}>
-                  Fragen
-                </label>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700, color: C.indigo }}>{count}</span>
-              </div>
-              <input type="range" min={5} max={30} step={1} value={count}
-                onChange={e => setCount(Number(e.target.value))}
-                style={{ width: '100%', accentColor: C.indigo, cursor: 'pointer', margin: 0 }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>5</span>
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>30</span>
-              </div>
+        {/* Settings card */}
+        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: '16px 18px' }}>
+          {/* Slider — full width */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Anzahl Fragen</label>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 700, color: C.indigo }}>{count}</span>
             </div>
+            <input type="range" min={5} max={30} step={1} value={count}
+              onChange={e => setCount(Number(e.target.value))}
+              style={{ width: '100%', accentColor: C.indigo, cursor: 'pointer', margin: 0, height: 4 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>5</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>30</span>
+            </div>
+          </div>
 
-            {/* Difficulty */}
+          {/* Dropdowns row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
-              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
-                Schwierigkeit
-              </label>
+              <label style={labelStyle}>Schwierigkeit</label>
               <div style={{ position: 'relative' }}>
                 <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={selStyle}>
                   <option value="einfach">Einfach</option>
@@ -818,30 +806,66 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
                 <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none', fontSize: 10, fontFamily: "'DM Mono', monospace" }}>▾</span>
               </div>
             </div>
-
-            {/* Level */}
             <div>
-              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
-                Niveau
-              </label>
+              <label style={labelStyle}>Sprachniveau</label>
               <div style={{ position: 'relative' }}>
                 <select value={level} onChange={e => setLevel(e.target.value)} style={selStyle}>
                   <option value="Grundschule">Grundschule</option>
-                  <option value="Sekundarstufe 1">Sek. I</option>
-                  <option value="Sekundarstufe 2">Sek. II</option>
+                  <option value="Sekundarstufe 1">Sekundarstufe 1</option>
+                  <option value="Sekundarstufe 2">Sekundarstufe 2</option>
                   <option value="Universität">Universität</option>
                 </select>
                 <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none', fontSize: 10, fontFamily: "'DM Mono', monospace" }}>▾</span>
               </div>
             </div>
           </div>
+
+          {/* Image toggle */}
+          <button
+            className="img-toggle"
+            onClick={() => setWithImages(!withImages)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: withImages ? `${C.indigo}12` : C.navy,
+              border: `1px solid ${withImages ? C.indigo : C.border}`,
+              borderRadius: 10, padding: '11px 14px', cursor: 'pointer',
+              transition: 'all 0.16s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>🖼</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, color: withImages ? C.chalk : C.muted }}>
+                  Bilder zu den Fragen
+                </div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: withImages ? `${C.indigo}cc` : `${C.muted}77`, letterSpacing: '0.06em' }}>
+                  {withImages ? 'aktiviert — passende Bilder werden gesucht' : 'optional · über Web-Suche'}
+                </div>
+              </div>
+            </div>
+            {/* Toggle pill */}
+            <div style={{
+              width: 42, height: 24, borderRadius: 12, flexShrink: 0,
+              background: withImages ? C.indigo : C.light,
+              border: `1px solid ${withImages ? C.indigo : C.border}`,
+              position: 'relative', transition: 'all 0.2s ease',
+            }}>
+              <div style={{
+                position: 'absolute', top: 3,
+                left: withImages ? 20 : 3,
+                width: 16, height: 16, borderRadius: '50%',
+                background: 'white', transition: 'left 0.2s ease',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+              }} />
+            </div>
+          </button>
         </div>
 
         {/* Progress */}
         {loading && (
-          <div style={{ marginBottom: 10 }}>
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              <span>KI generiert {count} Fragen…</span>
+              <span>KI generiert{withImages ? ' + sucht Bilder' : ''}…</span>
               <span>{Math.round(progress)}%</span>
             </div>
             <div style={{ background: C.light, borderRadius: 100, height: 3, overflow: 'hidden' }}>
@@ -852,28 +876,24 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
 
         {/* Error */}
         {error && (
-          <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}44`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, color: C.red, fontSize: 13 }}>
+          <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}44`, borderRadius: 10, padding: '10px 14px', color: C.red, fontSize: 13 }}>
             {error}
           </div>
         )}
 
         {/* Generate button */}
-        <button
-          className="gen-go"
-          onClick={handleGenerate}
-          disabled={loading}
+        <button className="gen-go" onClick={handleGenerate} disabled={loading}
           style={{
-            width: '100%', padding: '14px',
+            width: '100%', padding: '15px',
             background: loading ? C.light : `linear-gradient(135deg, ${C.indigo} 0%, ${C.purple} 100%)`,
             border: 'none', borderRadius: 12,
             color: loading ? C.muted : 'white',
             fontFamily: "'Space Grotesk', sans-serif",
             fontWeight: 700, fontSize: 15,
             cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.18s ease',
           }}
         >
-          {loading ? 'Generiere…' : `✦  ${count} Fragen generieren`}
+          {loading ? 'Generiere…' : `✦  ${count} Fragen generieren${withImages ? ' + Bilder' : ''}`}
         </button>
       </div>
     </div>
@@ -1506,26 +1526,48 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
         <div style={{
           background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
           border: `1px solid ${C.border}`,
-          borderRadius: 20, padding: '28px 28px 24px',
-          textAlign: 'center',
+          borderRadius: 20, overflow: 'hidden',
         }}>
-          <div style={{
-            display: 'inline-block',
-            fontFamily: "'DM Mono', monospace",
-            fontSize: 11, color: C.indigo,
-            background: `${C.indigo}18`, border: `1px solid ${C.indigo}30`,
-            borderRadius: 100, padding: '4px 14px',
-            letterSpacing: '0.1em', textTransform: 'uppercase',
-            marginBottom: 18,
-          }}>
-            Frage {current + 1}
+          {/* Question image */}
+          {q.imageUrl && (
+            <div style={{
+              width: '100%', height: 180, overflow: 'hidden',
+              position: 'relative',
+            }}>
+              <img
+                src={q.imageUrl}
+                alt=""
+                style={{
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  display: 'block',
+                }}
+                onError={e => { e.target.style.display = 'none'; e.target.parentElement.style.display = 'none'; }}
+              />
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to bottom, transparent 50%, rgba(26,37,64,0.6) 100%)',
+              }} />
+            </div>
+          )}
+          <div style={{ padding: '20px 24px 20px', textAlign: 'center' }}>
+            <div style={{
+              display: 'inline-block',
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 11, color: C.indigo,
+              background: `${C.indigo}18`, border: `1px solid ${C.indigo}30`,
+              borderRadius: 100, padding: '4px 14px',
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+              marginBottom: 14,
+            }}>
+              Frage {current + 1}
+            </div>
+            <p style={{
+              fontSize: 'clamp(16px, 2.5vw, 20px)',
+              fontWeight: 700, lineHeight: 1.45, color: C.chalk,
+            }}>
+              {q.question}
+            </p>
           </div>
-          <p style={{
-            fontSize: 'clamp(17px, 2.5vw, 22px)',
-            fontWeight: 700, lineHeight: 1.45, color: C.chalk,
-          }}>
-            {q.question}
-          </p>
         </div>
 
         {/* Answer grid 2×2 */}
