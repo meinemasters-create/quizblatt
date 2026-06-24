@@ -557,26 +557,19 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
-  const [dragging, setDragging] = useState(false);
   const fileRef = useRef();
   const intervalRef = useRef();
-
-  const difficulties = ['einfach', 'gemischt', 'schwer'];
-  const levels = ['Grundschule', 'Gymnasium', 'Universität'];
 
   const handleFileChange = (f) => {
     if (!f) return;
     const isPdf = f.type === 'application/pdf';
     const isImg = f.type.startsWith('image/');
     if (!isPdf && !isImg) { setError('Nur PDF oder Bilddateien erlaubt.'); return; }
-    setFile(f);
-    setSource(isPdf ? 'pdf' : 'image');
-    setError('');
+    setFile(f); setSource(isPdf ? 'pdf' : 'image'); setError('');
   };
 
   const startProgress = () => {
-    setProgress(5);
-    let val = 5;
+    setProgress(5); let val = 5;
     intervalRef.current = setInterval(() => {
       val += Math.random() * 8;
       if (val >= 88) { clearInterval(intervalRef.current); val = 88; }
@@ -591,7 +584,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   };
 
   const handleGenerate = async () => {
-    if (source === 'text' && !topic.trim()) { setError('Bitte gib ein Thema oder einen Text ein.'); return; }
+    if (source === 'text' && !topic.trim()) { setError('Bitte gib ein Thema ein.'); return; }
     if ((source === 'pdf' || source === 'image') && !file) { setError('Bitte wähle eine Datei aus.'); return; }
     setLoading(true); setError(''); startProgress();
     try {
@@ -599,24 +592,21 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
       if (file) {
         const b64 = await toBase64(file);
         body.imageData = b64; body.imageType = file.type;
-      } else {
-        body.content = topic;
-      }
+      } else { body.content = topic; }
+
       let allQuestions = [];
       if (file) {
-        const safeCount = Math.min(count, 10);
         const res = await fetch('/.netlify/functions/generate-quiz', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, count: safeCount }),
+          body: JSON.stringify({ ...body, count: Math.min(count, 10) }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
         allQuestions = data.questions || [];
       } else {
-        const BATCH = 5;
-        const batches = [];
-        let remaining = count;
-        while (remaining > 0) { batches.push(Math.min(BATCH, remaining)); remaining -= BATCH; }
+        const BATCH = 5; const batches = [];
+        let rem = count;
+        while (rem > 0) { batches.push(Math.min(BATCH, rem)); rem -= BATCH; }
         for (let i = 0; i < batches.length; i++) {
           const res = await fetch('/.netlify/functions/generate-quiz', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -630,112 +620,106 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
       }
       stopProgress();
       onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert' });
-    } catch (e) {
-      stopProgress(); setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { stopProgress(); setError(e.message); }
+    finally { setLoading(false); }
   };
 
   const sources = [
-    { id: 'text',  label: 'Thema / Text', icon: '✦' },
-    { id: 'pdf',   label: 'PDF',          icon: '⬡' },
-    { id: 'image', label: 'Foto',         icon: '◎' },
+    { id: 'text',  label: 'Thema / Text', icon: '✦', desc: 'Freitext eingeben' },
+    { id: 'pdf',   label: 'PDF',          icon: '⬡', desc: 'Dokument hochladen' },
+    { id: 'image', label: 'Foto',         icon: '◎', desc: 'Kamera oder Bild' },
   ];
 
+  const selStyle = {
+    width: '100%', appearance: 'none', WebkitAppearance: 'none',
+    background: C.navy, border: `1px solid ${C.border}`,
+    borderRadius: 8, padding: '9px 32px 9px 12px',
+    color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
+    fontSize: 13, fontWeight: 500, cursor: 'pointer', outline: 'none',
+  };
+
   return (
-    <div style={{ ...css.app, minHeight: '100vh' }}>
+    <div style={{ ...css.app, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>{`
-        .gen-tab { transition: all 0.18s ease; }
-        .gen-tab:hover { border-color: ${C.indigo} !important; color: ${C.chalk} !important; }
-        .gen-chip { transition: all 0.15s ease; }
-        .gen-chip:hover { border-color: ${C.indigo}88 !important; color: ${C.chalk} !important; }
-        .drop-zone { transition: all 0.18s ease; }
-        .gen-btn-primary { transition: all 0.18s ease; }
-        .gen-btn-primary:hover:not(:disabled) { opacity: 0.88 !important; transform: translateY(-1px); }
+        .gen-src { transition: all 0.16s ease; }
+        .gen-src:hover { border-color: ${C.indigo} !important; background: ${C.indigo}12 !important; }
+        .gen-src:hover .gen-src-icon { color: ${C.indigo} !important; }
+        .gen-src:hover .gen-src-label { color: ${C.chalk} !important; }
+        .drop-zone:hover { border-color: ${C.indigo} !important; background: ${C.indigo}0a !important; }
+        .gen-go:hover:not(:disabled) { opacity: 0.88 !important; transform: translateY(-1px) !important; }
+        select option { background: ${C.mid}; }
       `}</style>
 
-      {/* Page header — matches landing page style */}
-      <div style={{
-        padding: '40px 24px 0',
-        maxWidth: 720, margin: '0 auto', width: '100%',
-      }}>
-        <button
-          onClick={() => onNavigate('home')}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: C.muted, fontSize: 13, fontFamily: "'DM Mono', monospace",
-            letterSpacing: '0.06em', textTransform: 'uppercase',
-            display: 'flex', alignItems: 'center', gap: 6, padding: 0,
-            marginBottom: 32,
-          }}
-        >
-          ← Startseite
-        </button>
+      <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', padding: '28px 20px 24px', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-        <div style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 600,
-          letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase',
-          marginBottom: 10,
-        }}>
-          Quiz erstellen
+        {/* Back + eyebrow */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <button onClick={() => onNavigate('home')} style={{
+            background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
+            fontSize: 12, fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em',
+            textTransform: 'uppercase', padding: 0,
+          }}>← Zurück</button>
+          <div style={{ width: 1, height: 14, background: C.border }} />
+          <div style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", letterSpacing: '0.14em', color: C.indigo, textTransform: 'uppercase' }}>
+            Quiz erstellen
+          </div>
         </div>
-        <h1 style={{ fontSize: 'clamp(26px, 4vw, 36px)', fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
-          Wähle deine Quelle
-        </h1>
-        <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>
-          PDF, Foto oder ein Thema — die KI erstellt das Quiz.
-        </p>
 
-        {/* Source selector — pill tabs */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24,
-        }}>
+        {/* Source selector — horizontal, compact */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
           {sources.map(s => (
             <button
               key={s.id}
-              className="gen-tab"
+              className="gen-src"
               onClick={() => { setSource(s.id); setFile(null); setError(''); }}
               style={{
-                background: source === s.id ? `${C.indigo}18` : 'transparent',
+                background: source === s.id ? `${C.indigo}18` : C.mid,
                 border: `1.5px solid ${source === s.id ? C.indigo : C.border}`,
-                borderRadius: 12, padding: '14px 12px',
-                cursor: 'pointer', color: source === s.id ? C.chalk : C.muted,
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 600, fontSize: 14,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                borderRadius: 12, padding: '12px 10px',
+                cursor: 'pointer', textAlign: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                boxShadow: source === s.id ? `0 4px 20px ${C.indigo}28` : 'none',
               }}
             >
-              <span style={{
-                fontSize: 18, color: source === s.id ? C.indigo : C.muted,
+              <span className="gen-src-icon" style={{
+                fontSize: 20, lineHeight: 1,
                 fontFamily: "'DM Mono', monospace",
+                color: source === s.id ? C.indigo : C.muted,
+                transition: 'color 0.16s',
               }}>{s.icon}</span>
-              {s.label}
+              <span className="gen-src-label" style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700, fontSize: 13,
+                color: source === s.id ? C.chalk : C.muted,
+                transition: 'color 0.16s',
+              }}>{s.label}</span>
+              <span style={{
+                fontSize: 11, color: source === s.id ? `${C.indigo}cc` : `${C.muted}88`,
+                fontFamily: "'DM Mono', monospace",
+              }}>{s.desc}</span>
             </button>
           ))}
         </div>
 
-        {/* Input area */}
+        {/* Main card */}
         <div style={{
           background: C.mid, border: `1px solid ${C.border}`,
-          borderRadius: 16, padding: 24, marginBottom: 20,
+          borderRadius: 16, padding: '18px 20px', marginBottom: 10, flex: 1,
         }}>
+
+          {/* Text input */}
           {source === 'text' && (
             <>
-              <label style={{
-                display: 'block', fontFamily: "'DM Mono', monospace",
-                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
-                textTransform: 'uppercase', marginBottom: 10,
-              }}>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.14em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>
                 Thema oder Text
               </label>
               <textarea
                 style={{
-                  width: '100%', background: C.light,
+                  width: '100%', background: C.navy,
                   border: `1px solid ${C.border}`, borderRadius: 10,
-                  padding: '14px 16px', color: C.chalk,
-                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 15,
-                  outline: 'none', resize: 'vertical', minHeight: 130, lineHeight: 1.6,
+                  padding: '12px 14px', color: C.chalk,
+                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
+                  outline: 'none', resize: 'none', height: 90, lineHeight: 1.6,
                   boxSizing: 'border-box',
                 }}
                 placeholder="z. B. Die Weimarer Republik, Photosynthese, Satz des Pythagoras …"
@@ -745,59 +729,53 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
             </>
           )}
 
+          {/* File drop zone */}
           {(source === 'pdf' || source === 'image') && (
             <>
-              <label style={{
-                display: 'block', fontFamily: "'DM Mono', monospace",
-                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
-                textTransform: 'uppercase', marginBottom: 10,
-              }}>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.14em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>
                 {source === 'pdf' ? 'PDF hochladen' : 'Foto aufnehmen'}
               </label>
               <div
                 className="drop-zone"
                 onClick={() => fileRef.current?.click()}
-                onDragOver={e => { e.preventDefault(); }}
+                onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); handleFileChange(e.dataTransfer.files[0]); }}
                 style={{
                   border: `2px dashed ${file ? C.indigo : C.border}`,
-                  borderRadius: 12, padding: '36px 24px',
+                  borderRadius: 10, padding: '20px 16px',
                   textAlign: 'center', cursor: 'pointer',
                   background: file ? `${C.indigo}0a` : 'transparent',
+                  transition: 'all 0.16s ease',
+                  display: 'flex', alignItems: 'center', gap: 16,
                 }}
               >
                 <div style={{
-                  width: 48, height: 48, borderRadius: '50%',
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
                   background: file ? `${C.indigo}20` : C.light,
                   border: `1px solid ${file ? C.indigo : C.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 16px',
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: 20, color: file ? C.indigo : C.muted,
+                  fontFamily: "'DM Mono', monospace", fontSize: 18,
+                  color: file ? C.indigo : C.muted,
                 }}>
                   {file ? '✓' : (source === 'pdf' ? '⬡' : '◎')}
                 </div>
-                <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: C.chalk }}>
-                  {file ? file.name : (source === 'pdf' ? 'PDF hier ablegen oder antippen' : 'Foto aufnehmen oder auswählen')}
-                </p>
-                <p style={{ color: C.muted, fontSize: 13 }}>
-                  {file ? `${(file.size / 1024).toFixed(0)} KB` : (source === 'pdf' ? 'PDF bis 10 MB' : 'JPG, PNG, HEIC')}
-                </p>
+                <div style={{ textAlign: 'left', flex: 1 }}>
+                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, color: C.chalk }}>
+                    {file ? file.name : (source === 'pdf' ? 'PDF ablegen oder antippen' : 'Foto aufnehmen oder auswählen')}
+                  </p>
+                  <p style={{ color: C.muted, fontSize: 12 }}>
+                    {file ? `${(file.size / 1024).toFixed(0)} KB` : (source === 'pdf' ? 'PDF bis 10 MB' : 'JPG, PNG, HEIC')}
+                  </p>
+                </div>
                 {file && (
-                  <button
-                    onClick={e => { e.stopPropagation(); setFile(null); }}
-                    style={{
-                      marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
-                      borderRadius: 8, padding: '4px 12px', color: C.muted,
-                      fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, cursor: 'pointer',
-                    }}
-                  >
-                    Entfernen
-                  </button>
+                  <button onClick={e => { e.stopPropagation(); setFile(null); }} style={{
+                    background: 'none', border: `1px solid ${C.border}`, borderRadius: 6,
+                    padding: '4px 10px', color: C.muted,
+                    fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, cursor: 'pointer', flexShrink: 0,
+                  }}>✕</button>
                 )}
               </div>
-              <input
-                ref={fileRef} type="file"
+              <input ref={fileRef} type="file"
                 accept={source === 'pdf' ? 'application/pdf' : 'image/*'}
                 capture={source === 'image' ? 'environment' : undefined}
                 style={{ display: 'none' }}
@@ -805,148 +783,94 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
               />
             </>
           )}
-        </div>
 
-        {/* Settings */}
-        <div style={{
-          background: C.mid, border: `1px solid ${C.border}`,
-          borderRadius: 16, padding: 24, marginBottom: 24,
-        }}>
-          {/* Count slider */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-              <label style={{
-                fontFamily: "'DM Mono', monospace", fontSize: 11,
-                letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase',
-              }}>
-                Anzahl Fragen
-              </label>
-              <span style={{
-                fontFamily: "'DM Mono', monospace", fontSize: 26,
-                fontWeight: 700, color: C.indigo,
-              }}>{count}</span>
-            </div>
-            <input
-              type="range" min={5} max={30} step={1} value={count}
-              onChange={e => setCount(Number(e.target.value))}
-              style={{ width: '100%', accentColor: C.indigo, cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: `${C.muted}88` }}>5</span>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: `${C.muted}88` }}>30</span>
-            </div>
-          </div>
-
-          {/* Difficulty + Level — dropdowns */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          {/* Settings row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 16 }}>
+            {/* Count */}
             <div>
-              <label style={{
-                display: 'block', fontFamily: "'DM Mono', monospace",
-                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
-                textTransform: 'uppercase', marginBottom: 10,
-              }}>Schwierigkeit</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase' }}>
+                  Fragen
+                </label>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700, color: C.indigo }}>{count}</span>
+              </div>
+              <input type="range" min={5} max={30} step={1} value={count}
+                onChange={e => setCount(Number(e.target.value))}
+                style={{ width: '100%', accentColor: C.indigo, cursor: 'pointer', margin: 0 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>5</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>30</span>
+              </div>
+            </div>
+
+            {/* Difficulty */}
+            <div>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
+                Schwierigkeit
+              </label>
               <div style={{ position: 'relative' }}>
-                <select
-                  value={difficulty}
-                  onChange={e => setDifficulty(e.target.value)}
-                  style={{
-                    width: '100%', appearance: 'none', WebkitAppearance: 'none',
-                    background: C.light, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: '11px 40px 11px 14px',
-                    color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
-                    fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none',
-                  }}
-                >
+                <select value={difficulty} onChange={e => setDifficulty(e.target.value)} style={selStyle}>
                   <option value="einfach">Einfach</option>
                   <option value="gemischt">Gemischt</option>
                   <option value="schwer">Schwer</option>
                 </select>
-                <span style={{
-                  position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-                  color: C.muted, pointerEvents: 'none', fontSize: 11,
-                  fontFamily: "'DM Mono', monospace",
-                }}>▾</span>
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none', fontSize: 10, fontFamily: "'DM Mono', monospace" }}>▾</span>
               </div>
             </div>
+
+            {/* Level */}
             <div>
-              <label style={{
-                display: 'block', fontFamily: "'DM Mono', monospace",
-                fontSize: 11, letterSpacing: '0.12em', color: C.muted,
-                textTransform: 'uppercase', marginBottom: 10,
-              }}>Sprachniveau</label>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
+                Niveau
+              </label>
               <div style={{ position: 'relative' }}>
-                <select
-                  value={level}
-                  onChange={e => setLevel(e.target.value)}
-                  style={{
-                    width: '100%', appearance: 'none', WebkitAppearance: 'none',
-                    background: C.light, border: `1px solid ${C.border}`,
-                    borderRadius: 10, padding: '11px 40px 11px 14px',
-                    color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
-                    fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none',
-                  }}
-                >
+                <select value={level} onChange={e => setLevel(e.target.value)} style={selStyle}>
                   <option value="Grundschule">Grundschule</option>
-                  <option value="Sekundarstufe 1">Sekundarstufe 1</option>
-                  <option value="Sekundarstufe 2">Sekundarstufe 2</option>
+                  <option value="Sekundarstufe 1">Sek. I</option>
+                  <option value="Sekundarstufe 2">Sek. II</option>
                   <option value="Universität">Universität</option>
                 </select>
-                <span style={{
-                  position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-                  color: C.muted, pointerEvents: 'none', fontSize: 11,
-                  fontFamily: "'DM Mono', monospace",
-                }}>▾</span>
+                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: C.muted, pointerEvents: 'none', fontSize: 10, fontFamily: "'DM Mono', monospace" }}>▾</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress */}
         {loading && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', marginBottom: 8,
-              fontFamily: "'DM Mono', monospace", fontSize: 11,
-              color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em',
-            }}>
-              <span>KI generiert {count} Fragen</span>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span>KI generiert {count} Fragen…</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div style={{ background: C.light, borderRadius: 100, height: 4, overflow: 'hidden' }}>
-              <div style={{
-                width: `${progress}%`, height: '100%',
-                background: `linear-gradient(90deg, ${C.indigo}, ${C.purple})`,
-                borderRadius: 100, transition: 'width 0.4s ease',
-              }} />
+            <div style={{ background: C.light, borderRadius: 100, height: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${progress}%`, height: '100%', background: `linear-gradient(90deg, ${C.indigo}, ${C.purple})`, borderRadius: 100, transition: 'width 0.4s ease' }} />
             </div>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div style={{
-            background: `${C.red}12`, border: `1px solid ${C.red}44`,
-            borderRadius: 12, padding: '14px 18px', marginBottom: 20,
-            color: C.red, fontSize: 14,
-          }}>
+          <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}44`, borderRadius: 10, padding: '10px 14px', marginBottom: 10, color: C.red, fontSize: 13 }}>
             {error}
           </div>
         )}
 
         {/* Generate button */}
         <button
-          className="gen-btn-primary"
+          className="gen-go"
           onClick={handleGenerate}
           disabled={loading}
           style={{
-            width: '100%', padding: '16px',
+            width: '100%', padding: '14px',
             background: loading ? C.light : `linear-gradient(135deg, ${C.indigo} 0%, ${C.purple} 100%)`,
-            border: 'none', borderRadius: 14,
+            border: 'none', borderRadius: 12,
             color: loading ? C.muted : 'white',
             fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700, fontSize: 16,
+            fontWeight: 700, fontSize: 15,
             cursor: loading ? 'not-allowed' : 'pointer',
-            marginBottom: 48,
+            transition: 'all 0.18s ease',
           }}
         >
           {loading ? 'Generiere…' : `✦  ${count} Fragen generieren`}
