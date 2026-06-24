@@ -1532,10 +1532,10 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('home');
-  const [quizData, setQuizData] = useState(null); // { questions, mode, opts }
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
-  const [savedNavData, setSavedNavData] = useState(null);
+  // Use a ref so quiz data is NEVER lost between renders or state updates
+  const quizRef = useRef({ questions: [], mode: null, opts: null });
 
   useEffect(() => {
     // Check for PIN in URL
@@ -1559,36 +1559,38 @@ export default function App() {
   };
 
   const navigate = (to, data = null) => {
-    setSavedNavData(data);
-    setScreen(to);
-    if (to !== 'play') {
-      window.scrollTo(0, 0);
+    if (data) {
+      quizRef.current = { ...quizRef.current, ...data };
     }
+    if (to !== 'play') window.scrollTo(0, 0);
+    setScreen(to);
   };
 
   const startQuiz = (questions, mode, opts) => {
-    const safeQuestions = questions || [];
-    window.__lastQuizData = { questions: safeQuestions, mode, opts };
-    setQuizData({ questions: safeQuestions, mode, opts });
+    // Store directly in ref - guaranteed to persist
+    quizRef.current = { questions: questions || [], mode, opts };
     setScreen('play');
   };
 
+  const onQuizReady = (questions, opts) => {
+    quizRef.current = { questions: questions || [], mode: null, opts };
+    setScreen('ready');
+  };
+
   const renderScreen = () => {
+    const { questions, mode, opts } = quizRef.current;
     switch (screen) {
       case 'home':
         return <HomeScreen onNavigate={navigate} user={user} />;
       case 'join':
         return <JoinScreen onNavigate={navigate} onStartQuiz={startQuiz} />;
       case 'generate':
-        return <GenerateScreen onNavigate={navigate} onQuizReady={(questions, opts) => {
-          setQuizData({ questions, opts });
-          navigate('ready');
-        }} user={user} />;
+        return <GenerateScreen onNavigate={navigate} onQuizReady={onQuizReady} user={user} />;
       case 'ready':
         return (
           <QuizReadyScreen
-            questions={savedNavData?.questions || quizData?.questions || []}
-            opts={savedNavData?.opts || quizData?.opts}
+            questions={questions}
+            opts={opts}
             onNavigate={navigate}
             onStartQuiz={startQuiz}
             user={user}
@@ -1598,9 +1600,9 @@ export default function App() {
       case 'play':
         return (
           <QuizPlayScreen
-            questions={quizData?.questions || []}
-            mode={quizData?.mode}
-            opts={quizData?.opts}
+            questions={questions}
+            mode={mode}
+            opts={opts}
             onNavigate={navigate}
             showToast={showToast}
           />
