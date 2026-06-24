@@ -1109,6 +1109,14 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
 }
 
 // ─── SCREEN: Quiz Play ────────────────────────────────────────────────────────
+// Answer option colors like Kahoot
+const ANSWER_COLORS = [
+  { bg: '#E21B3C', light: '#FF2745' }, // A - Red
+  { bg: '#1368CE', light: '#1E7FFF' }, // B - Blue
+  { bg: '#D89E00', light: '#FFB800' }, // C - Yellow
+  { bg: '#26890C', light: '#2DAD0F' }, // D - Green
+];
+
 function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsProp, onNavigate, showToast }) {
   // Ultimate fallback: read from sessionStorage if props are empty
   const stored = JSON.parse(sessionStorage.getItem('quizPlay') || '{}');
@@ -1124,6 +1132,28 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
   const [results, setResults] = useState([]);
   const [done, setDone] = useState(false);
   const [exitModal, setExitModal] = useState(false);
+
+  // Guard: no questions loaded
+  if (!questions || questions.length === 0) {
+    return (
+      <div style={{ minHeight: '100vh', background: C.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 20, padding: 40, maxWidth: 440, width: '100%', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h2 style={{ color: C.chalk, fontSize: 22, fontWeight: 700, marginBottom: 12 }}>Keine Fragen geladen</h2>
+          <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
+            Bei PDF-Dokumenten kann die Generierung von 10+ Fragen etwas länger dauern.
+            Bitte geh zurück und versuche es mit <strong style={{ color: C.chalk }}>5 Fragen</strong> oder einem <strong style={{ color: C.chalk }}>kürzeren Thema als Text</strong>.
+          </p>
+          <button
+            onClick={() => onNavigate('generate')}
+            style={{ background: C.indigo, border: 'none', borderRadius: 12, padding: '14px 28px', color: 'white', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, cursor: 'pointer', width: '100%' }}
+          >
+            ← Zurück zur Generierung
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const q = shuffled.current[current];
   const total = shuffled.current.length;
@@ -1146,218 +1176,305 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
     }
   };
 
+  // ── Results Screen ──────────────────────────────────────────────────────────
   if (done) {
     const pct = Math.round((score / total) * 100);
-    const grade = pct >= 90 ? 'Ausgezeichnet!' : pct >= 70 ? 'Gut gemacht!' : pct >= 50 ? 'Weiter üben!' : 'Nicht aufgeben!';
+    const grade = pct >= 90 ? '🏆 Ausgezeichnet!' : pct >= 70 ? '🎉 Gut gemacht!' : pct >= 50 ? '💪 Weiter üben!' : '📚 Nicht aufgeben!';
+    const scoreColor = pct >= 70 ? C.green : pct >= 50 ? C.amber : C.red;
     return (
-      <div style={{ ...css.app, padding: '20px 0 60px' }}>
-        <div style={css.container}>
-          {/* Result Summary */}
+      <div style={{ ...css.app, minHeight: '100vh' }}>
+        <style>{`
+          @media (max-width: 600px) { .result-grid { grid-template-columns: 1fr !important; } }
+        `}</style>
+        {/* Hero result banner */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
+          borderBottom: `1px solid ${C.border}`,
+          padding: '40px 24px 32px',
+          textAlign: 'center',
+        }}>
+          <div style={{ marginBottom: 12 }}>{Icon.trophy}</div>
+          <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 16 }}>{grade}</h2>
           <div style={{
-            ...css.card,
-            textAlign: 'center',
-            marginBottom: 24,
-            background: `linear-gradient(135deg, ${C.mid}, ${C.light})`,
+            display: 'inline-flex', alignItems: 'baseline', gap: 8,
+            background: `${scoreColor}1a`, border: `2px solid ${scoreColor}`,
+            borderRadius: 20, padding: '12px 32px', marginBottom: 16,
           }}>
-            <div style={{ marginBottom: 16 }}>{Icon.trophy}</div>
-            <h2 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>{grade}</h2>
-            <div style={{
-              fontSize: 56,
-              fontWeight: 700,
-              color: pct >= 70 ? C.green : pct >= 50 ? C.amber : C.red,
-              fontFamily: "'DM Mono', monospace",
-              lineHeight: 1,
-              marginBottom: 8,
-            }}>
-              {pct}%
-            </div>
-            <p style={{ color: C.muted, fontSize: 16 }}>
-              {score} von {total} Fragen richtig
-            </p>
-            <div style={{ marginTop: 16 }}>
-              <ProgressBar
-                value={pct}
-                color={pct >= 70 ? C.green : pct >= 50 ? C.amber : C.red}
-                height={10}
-                animated
-              />
-            </div>
+            <span style={{
+              fontSize: 64, fontWeight: 700, color: scoreColor,
+              fontFamily: "'DM Mono', monospace", lineHeight: 1,
+            }}>{pct}</span>
+            <span style={{ fontSize: 28, color: scoreColor, fontWeight: 700 }}>%</span>
           </div>
-
-          {/* Question Review */}
-          <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Fragenübersicht</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-            {results.map((r, i) => (
-              <div
-                key={i}
-                style={{
-                  ...css.card,
-                  padding: 16,
-                  border: `1px solid ${r.correct ? `${C.green}44` : `${C.red}44`}`,
-                  background: r.correct ? `${C.green}0a` : `${C.red}0a`,
-                }}
-              >
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ flexShrink: 0, marginTop: 2 }}>
-                    {r.correct ? Icon.check : Icon.wrong}
-                  </div>
-                  <div>
-                    <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{r.question}</p>
-                    <p style={{ color: C.muted, fontSize: 13 }}>{r.explanation}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <p style={{ color: C.muted, fontSize: 16, marginBottom: 20 }}>
+            {score} von {total} Fragen richtig
+          </p>
+          <div style={{ maxWidth: 400, margin: '0 auto 24px' }}>
+            <ProgressBar value={pct} color={scoreColor} height={10} animated />
           </div>
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={() => onNavigate('home')}
-              style={{ ...css.btn('ghost'), flex: 1 }}
-            >
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => onNavigate('home')} style={{ ...css.btn('ghost'), minWidth: 140 }}>
               Zur Startseite
             </button>
             <button
               onClick={() => {
-                setCurrent(0);
-                setSelected(null);
-                setScore(0);
-                setResults([]);
-                setDone(false);
+                setCurrent(0); setSelected(null); setScore(0);
+                setResults([]); setDone(false);
                 shuffled.current = questions.map(shuffleAnswers);
               }}
-              style={{ ...css.btn(), flex: 1 }}
+              style={{ ...css.btn('primary'), minWidth: 140 }}
             >
               Wiederholen
             </button>
+          </div>
+        </div>
+
+        {/* Question review */}
+        <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 24px 60px' }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: C.muted, fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Fragenübersicht
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {results.map((r, i) => (
+              <div key={i} style={{
+                background: r.correct ? `${C.green}0f` : `${C.red}0f`,
+                border: `1px solid ${r.correct ? C.green : C.red}44`,
+                borderRadius: 14, padding: '16px 18px',
+                display: 'flex', gap: 14, alignItems: 'flex-start',
+              }}>
+                <div style={{ flexShrink: 0, marginTop: 2 }}>{r.correct ? Icon.check : Icon.wrong}</div>
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 6, lineHeight: 1.4 }}>{r.question}</p>
+                  <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>{r.explanation}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Quiz Play Screen ────────────────────────────────────────────────────────
+  const progressPct = (current / total) * 100;
+
   return (
-    <div style={{ ...css.app, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* Header */}
+    <div style={{
+      ...css.app,
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      <style>{`
+        @media (max-width: 600px) {
+          .answer-grid { grid-template-columns: 1fr !important; }
+        }
+        .answer-btn { transition: transform 0.12s ease, opacity 0.2s ease !important; }
+        .answer-btn:hover:not(:disabled) { transform: scale(1.02) !important; }
+        .answer-btn:active:not(:disabled) { transform: scale(0.98) !important; }
+      `}</style>
+
+      {/* ── Top bar ── */}
       <div style={{
         background: C.mid,
         borderBottom: `1px solid ${C.border}`,
-        padding: '14px 20px',
+        padding: '0 20px',
+        height: 56,
         display: 'flex',
         alignItems: 'center',
         gap: 16,
         position: 'sticky', top: 0, zIndex: 100,
+        flexShrink: 0,
       }}>
-        <button onClick={() => setExitModal(true)} style={{ ...css.btn('ghost'), padding: '6px 10px', flexShrink: 0 }}>
-          ✕
-        </button>
-        <div style={{ flex: 1 }}>
-          <ProgressBar value={(current / total) * 100} />
+        <button
+          onClick={() => setExitModal(true)}
+          style={{
+            background: 'transparent', border: `1px solid ${C.border}`,
+            borderRadius: 8, width: 32, height: 32,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: C.muted, fontSize: 14, flexShrink: 0,
+          }}
+        >✕</button>
+
+        {/* Progress bar */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          <div style={{ background: C.light, borderRadius: 100, height: 8, overflow: 'hidden' }}>
+            <div style={{
+              width: `${progressPct}%`, height: '100%',
+              background: `linear-gradient(90deg, ${C.indigo}, ${C.purple})`,
+              borderRadius: 100, transition: 'width 0.4s ease',
+            }} />
+          </div>
         </div>
+
+        {/* Counter */}
         <div style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: 13, color: C.muted, flexShrink: 0,
+          fontFamily: "'DM Mono', monospace", fontSize: 13,
+          color: C.muted, flexShrink: 0,
         }}>
-          {current + 1}/{total}
+          {current + 1} / {total}
         </div>
+
+        {/* Score */}
         <div style={{
-          background: `${C.amber}22`, border: `1px solid ${C.amber}44`,
-          borderRadius: 100, padding: '4px 12px',
+          background: `${C.amber}20`, border: `1px solid ${C.amber}50`,
+          borderRadius: 100, padding: '4px 14px',
           fontFamily: "'DM Mono', monospace",
-          fontSize: 13, color: C.amber, fontWeight: 700,
-          flexShrink: 0,
+          fontSize: 14, color: C.amber, fontWeight: 700, flexShrink: 0,
         }}>
           {score} ★
         </div>
       </div>
 
-      {/* Question */}
-      <div style={{ flex: 1, ...css.container, padding: '32px 20px' }}>
-        <div style={{ ...css.card, marginBottom: 20, minHeight: 100 }}>
+      {/* ── Question area ── */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        maxWidth: 860,
+        width: '100%',
+        margin: '0 auto',
+        padding: '28px 20px 32px',
+        gap: 24,
+      }}>
+
+        {/* Question card */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
+          border: `1px solid ${C.border}`,
+          borderRadius: 20,
+          padding: '28px 28px 24px',
+          textAlign: 'center',
+          boxShadow: `0 4px 24px #00000033`,
+        }}>
           <div style={{
-            fontSize: 11, fontFamily: "'DM Mono', monospace",
-            color: C.muted, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.08em',
+            display: 'inline-block',
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 11, fontWeight: 600,
+            color: C.indigo,
+            background: `${C.indigo}1a`,
+            border: `1px solid ${C.indigo}33`,
+            borderRadius: 100,
+            padding: '4px 14px',
+            marginBottom: 16,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
           }}>
             Frage {current + 1}
           </div>
-          <p style={{ fontSize: 'clamp(16px, 3vw, 20px)', fontWeight: 600, lineHeight: 1.5 }}>
+          <p style={{
+            fontSize: 'clamp(17px, 3vw, 22px)',
+            fontWeight: 700,
+            lineHeight: 1.45,
+            color: C.chalk,
+          }}>
             {q.question}
           </p>
         </div>
 
-        {/* Options */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        {/* ── Answer grid (2x2 like Kahoot) ── */}
+        <div
+          className="answer-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 14,
+          }}
+        >
           {q.shuffledOptions.map((opt, i) => {
             const isSelected = selected === i;
             const isCorrect = i === q.shuffledCorrect;
             const showResult = selected !== null;
-            let bg = C.mid;
-            let border = C.border;
-            let textColor = C.chalk;
+            const color = ANSWER_COLORS[i];
+
+            // Determine visual state
+            let opacity = 1;
+            let borderColor = 'transparent';
+            let bgColor = color.bg;
+            let extraStyle = {};
+
             if (showResult) {
-              if (isCorrect) { bg = `${C.green}22`; border = C.green; }
-              else if (isSelected && !isCorrect) { bg = `${C.red}22`; border = C.red; }
-            } else if (isSelected) {
-              bg = `${C.indigo}22`; border = C.indigo;
+              if (isCorrect) {
+                borderColor = '#fff';
+                bgColor = color.bg;
+                extraStyle = { boxShadow: `0 0 0 3px white, 0 8px 32px ${color.bg}88` };
+              } else if (isSelected && !isCorrect) {
+                opacity = 0.55;
+              } else if (!isCorrect) {
+                opacity = 0.35;
+              }
             }
+
             return (
               <button
                 key={i}
+                className="answer-btn"
                 onClick={() => handleSelect(i)}
                 disabled={selected !== null}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
-                  background: bg,
-                  border: `1.5px solid ${border}`,
-                  borderRadius: 12,
-                  padding: '14px 18px',
+                  background: bgColor,
+                  border: `3px solid ${borderColor}`,
+                  borderRadius: 16,
+                  padding: '18px 16px',
                   cursor: selected !== null ? 'default' : 'pointer',
                   textAlign: 'left',
-                  color: textColor,
+                  color: 'white',
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: 15,
-                  fontWeight: 500,
-                  transition: 'all 0.2s ease',
-                  width: '100%',
+                  fontWeight: 700,
+                  opacity,
+                  minHeight: 90,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  boxShadow: showResult && isCorrect ? extraStyle.boxShadow : `0 4px 16px ${color.bg}55`,
+                  ...extraStyle,
                 }}
               >
+                {/* Letter badge */}
                 <span style={{
-                  width: 32, height: 32,
-                  borderRadius: 8,
-                  background: showResult && isCorrect ? C.green : showResult && isSelected ? C.red : `${C.indigo}33`,
-                  color: showResult ? 'white' : C.indigo,
+                  width: 36, height: 36,
+                  borderRadius: 10,
+                  background: 'rgba(0,0,0,0.25)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: "'DM Mono', monospace",
-                  fontWeight: 700, fontSize: 13,
+                  fontWeight: 700, fontSize: 15,
                   flexShrink: 0,
-                  transition: 'all 0.2s',
                 }}>
                   {LABELS[i]}
                 </span>
-                <span>{opt.text}</span>
+
+                {/* Answer text */}
+                <span style={{ fontSize: 'clamp(13px, 2vw, 15px)', lineHeight: 1.4, flex: 1 }}>
+                  {opt.text}
+                </span>
+
+                {/* Result icon */}
                 {showResult && isCorrect && (
-                  <span style={{ marginLeft: 'auto' }}>{Icon.check}</span>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>✓</span>
                 )}
                 {showResult && isSelected && !isCorrect && (
-                  <span style={{ marginLeft: 'auto' }}>{Icon.wrong}</span>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>✗</span>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Explanation */}
+        {/* Explanation after answer */}
         {selected !== null && (
           <div style={{
-            ...css.card,
-            background: `${C.indigo}15`,
-            border: `1px solid ${C.indigo}33`,
-            marginBottom: 20,
+            background: `${C.indigo}18`,
+            border: `1px solid ${C.indigo}44`,
+            borderRadius: 14,
+            padding: '18px 20px',
           }}>
-            <p style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", color: C.indigo, marginBottom: 6 }}>
-              ERKLÄRUNG
+            <p style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 11, color: C.indigo,
+              textTransform: 'uppercase', letterSpacing: '0.08em',
+              marginBottom: 8,
+            }}>
+              Erklärung
             </p>
             <p style={{ color: C.chalk, fontSize: 15, lineHeight: 1.6 }}>
               {q.explanation}
@@ -1365,12 +1482,22 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
           </div>
         )}
 
+        {/* Next button */}
         {selected !== null && (
           <button
             onClick={handleNext}
-            style={{ ...css.btn('primary'), width: '100%', fontSize: 16, padding: '14px' }}
+            style={{
+              ...css.btn('primary'),
+              width: '100%',
+              fontSize: 16,
+              padding: '16px',
+              borderRadius: 14,
+              background: current + 1 >= total
+                ? `linear-gradient(135deg, ${C.amber}, #FF8C00)`
+                : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+            }}
           >
-            {current + 1 >= total ? '🏆 Ergebnis anzeigen' : 'Weiter →'}
+            {current + 1 >= total ? '🏆 Ergebnis anzeigen' : 'Nächste Frage →'}
           </button>
         )}
       </div>
