@@ -7,7 +7,7 @@
   node_bundler = "esbuild"
 
 [functions."generate-quiz"]
-  timeout = 30
+  timeout = 26
 
 [[redirects]]
   from = "/*"
