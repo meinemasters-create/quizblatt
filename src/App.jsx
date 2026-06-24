@@ -293,13 +293,6 @@ function HomeScreen({ onNavigate, user }) {
 
   const tiles = [
     {
-      id: 'account',
-      emoji: '👤',
-      label: 'Account',
-      desc: 'Anmelden und Quizzes dauerhaft speichern',
-      color: C.purple,
-    },
-    {
       id: 'join',
       emoji: '🔑',
       label: 'Quiz beitreten',
@@ -318,7 +311,7 @@ function HomeScreen({ onNavigate, user }) {
   return (
     <div style={{ ...css.app, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <style>{`
-        @media (max-width: 600px) {
+        @media (max-width: 480px) {
           .home-tiles { grid-template-columns: 1fr !important; }
         }
         .home-tile:hover { transform: translateY(-4px) !important; }
@@ -396,10 +389,10 @@ function HomeScreen({ onNavigate, user }) {
         className="home-tiles"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(2, 1fr)',
           gap: 16,
           padding: '0 24px 48px',
-          maxWidth: 900,
+          maxWidth: 640,
           margin: '0 auto',
           width: '100%',
         }}
@@ -1745,10 +1738,9 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
   const [quizzes, setQuizzes] = useState([]);
   const [folders, setFolders] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
-  useEffect(() => {
-    if (user && supabase) loadMyQuizzes();
-  }, [user]);
+  useEffect(() => { if (user && supabase) loadMyQuizzes(); }, [user]);
 
   const loadMyQuizzes = async () => {
     const [{ data: qData }, { data: fData }] = await Promise.all([
@@ -1760,27 +1752,17 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
   };
 
   const handleAuth = async () => {
-    if (!supabase) {
-      setError('Supabase ist nicht konfiguriert. Bitte VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY setzen.');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (!supabase) { setError('Supabase ist nicht konfiguriert.'); return; }
+    setLoading(true); setError('');
     try {
-      let result;
-      if (mode === 'login') {
-        result = await supabase.auth.signInWithPassword({ email, password });
-      } else {
-        result = await supabase.auth.signUp({ email, password });
-      }
+      const result = mode === 'login'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
       if (result.error) throw result.error;
       setUser(result.data.user);
       showToast(mode === 'login' ? 'Angemeldet!' : 'Konto erstellt!', 'success');
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
@@ -1788,58 +1770,129 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
     setUser(null);
   };
 
+  const handleDelete = async (id) => {
+    if (!supabase) return;
+    setDeleting(id);
+    const { error } = await supabase.from('saved_quizzes').delete().eq('id', id);
+    if (error) showToast('Fehler beim Löschen', 'error');
+    else {
+      setQuizzes(q => q.filter(x => x.id !== id));
+      showToast('Quiz gelöscht', 'success');
+    }
+    setDeleting(null);
+  };
+
+  // ── Login / Register ────────────────────────────────────────────────────────
   if (!user) {
     return (
-      <div style={{ ...css.app, padding: '20px 0 60px' }}>
-        <div style={css.container}>
-          <button onClick={() => onNavigate('home')} style={{ ...css.btn('ghost'), marginBottom: 24 }}>
-            {Icon.back} Zurück
-          </button>
-          <div style={css.card}>
-            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
-              {mode === 'login' ? 'Anmelden' : 'Konto erstellen'}
-            </h2>
-            <p style={{ color: C.muted, marginBottom: 24 }}>
-              {mode === 'login'
-                ? 'Meld dich an, um deine gespeicherten Quizze zu sehen.'
-                : 'Erstelle ein kostenloses Konto und speichere deine Quizze.'}
-            </p>
+      <div style={{ ...css.app, minHeight: '100vh' }}>
+        <style>{`
+          .auth-input:focus { border-color: ${C.indigo} !important; }
+          .auth-btn-primary { transition: opacity 0.15s, transform 0.15s; }
+          .auth-btn-primary:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+        `}</style>
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 24px 60px' }}>
+          <button
+            onClick={() => onNavigate('home')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: C.muted, fontSize: 13, fontFamily: "'DM Mono', monospace",
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6, padding: 0, marginBottom: 40,
+            }}
+          >← Startseite</button>
 
-            <label style={css.label}>E-Mail</label>
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.16em', color: C.indigo,
+            textTransform: 'uppercase', marginBottom: 10,
+          }}>
+            {mode === 'login' ? 'Anmelden' : 'Konto erstellen'}
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
+            {mode === 'login' ? 'Willkommen zurück' : 'Konto erstellen'}
+          </h1>
+          <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>
+            {mode === 'login'
+              ? 'Meld dich an, um deine gespeicherten Quizze zu sehen.'
+              : 'Erstelle ein kostenloses Konto und speichere deine Quizze.'}
+          </p>
+
+          <div style={{
+            background: C.mid, border: `1px solid ${C.border}`,
+            borderRadius: 16, padding: 24,
+          }}>
+            <label style={{
+              display: 'block', fontFamily: "'DM Mono', monospace",
+              fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 8,
+            }}>E-Mail</label>
             <input
+              className="auth-input"
               type="email"
-              style={{ ...css.input, marginBottom: 14 }}
+              style={{
+                ...css.input, marginBottom: 16,
+                transition: 'border-color 0.15s',
+              }}
               placeholder="name@schule.de"
               value={email}
               onChange={e => { setEmail(e.target.value); setError(''); }}
             />
-            <label style={css.label}>Passwort</label>
+
+            <label style={{
+              display: 'block', fontFamily: "'DM Mono', monospace",
+              fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 8,
+            }}>Passwort</label>
             <input
+              className="auth-input"
               type="password"
-              style={{ ...css.input, marginBottom: error ? 8 : 20 }}
+              style={{
+                ...css.input,
+                marginBottom: error ? 10 : 24,
+                transition: 'border-color 0.15s',
+              }}
               placeholder="Mindestens 6 Zeichen"
               value={password}
               onChange={e => { setPassword(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleAuth()}
             />
+
             {error && (
-              <p style={{ color: C.red, fontSize: 14, marginBottom: 12 }}>{error}</p>
+              <div style={{
+                background: `${C.red}12`, border: `1px solid ${C.red}44`,
+                borderRadius: 10, padding: '10px 14px',
+                color: C.red, fontSize: 13, marginBottom: 16,
+              }}>{error}</div>
             )}
+
             <button
+              className="auth-btn-primary"
               onClick={handleAuth}
               disabled={loading}
               style={{
-                ...css.btn('primary'),
-                width: '100%',
-                marginBottom: 14,
-                opacity: loading ? 0.6 : 1,
+                width: '100%', padding: '14px',
+                background: loading ? C.light : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                border: 'none', borderRadius: 12,
+                color: loading ? C.muted : 'white',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700, fontSize: 15,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                marginBottom: 12,
               }}
             >
-              {loading ? 'Lade…' : (mode === 'login' ? 'Anmelden' : 'Konto erstellen')}
+              {loading ? 'Bitte warten…' : (mode === 'login' ? 'Anmelden' : 'Konto erstellen')}
             </button>
+
             <button
               onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
-              style={{ ...css.btn('ghost'), width: '100%' }}
+              style={{
+                width: '100%', padding: '12px',
+                background: 'transparent', border: `1px solid ${C.border}`,
+                borderRadius: 12, color: C.muted,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}
             >
               {mode === 'login' ? 'Noch kein Konto? Registrieren' : 'Schon ein Konto? Anmelden'}
             </button>
@@ -1849,93 +1902,231 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
     );
   }
 
+  // ── Logged-in Dashboard ─────────────────────────────────────────────────────
   const filteredQuizzes = selectedFolder
     ? quizzes.filter(q => q.folder_id === selectedFolder)
-    : quizzes.filter(q => !q.folder_id);
+    : quizzes;
 
   return (
-    <div style={{ ...css.app, padding: '20px 0 60px' }}>
-      <div style={css.container}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <button onClick={() => onNavigate('home')} style={{ ...css.btn('ghost') }}>
-            {Icon.back} Zurück
-          </button>
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <style>{`
+        .quiz-card { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .quiz-card:hover { border-color: ${C.indigo}66 !important; box-shadow: 0 4px 20px ${C.indigo}18 !important; }
+        .del-btn { transition: opacity 0.15s, color 0.15s; opacity: 0; }
+        .quiz-card:hover .del-btn { opacity: 1 !important; }
+      `}</style>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 24px 60px' }}>
+
+        {/* Top nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>
+          <button
+            onClick={() => onNavigate('home')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: C.muted, fontSize: 13, fontFamily: "'DM Mono', monospace",
+              letterSpacing: '0.06em', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6, padding: 0,
+            }}
+          >← Startseite</button>
           <div style={{ flex: 1 }} />
-          <button onClick={handleLogout} style={{ ...css.btn('ghost'), padding: '8px 14px', fontSize: 13 }}>
-            {Icon.logout} Abmelden
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'transparent', border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: '8px 16px',
+              color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 600, fontSize: 13, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            Abmelden
           </button>
         </div>
 
-        <div style={{ ...css.card, marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {/* Profile + CTA */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.mid} 0%, ${C.light} 100%)`,
+          border: `1px solid ${C.border}`,
+          borderRadius: 20, padding: '28px 28px 24px',
+          marginBottom: 32,
+          display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
+        }}>
+          {/* Avatar */}
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
+            background: `${C.indigo}28`, border: `2px solid ${C.indigo}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 22, fontWeight: 700, color: C.indigo,
+          }}>
+            {user.email[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              width: 48, height: 48, borderRadius: '50%',
-              background: `${C.purple}33`, border: `2px solid ${C.purple}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20,
+              fontFamily: "'DM Mono', monospace", fontSize: 11,
+              letterSpacing: '0.12em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 4,
+            }}>Angemeldet als</div>
+            <div style={{
+              fontWeight: 700, fontSize: 16,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {user.email[0].toUpperCase()}
+              {user.email}
             </div>
-            <div>
-              <div style={{ fontWeight: 700 }}>{user.email}</div>
-              <div style={{ color: C.muted, fontSize: 13 }}>{quizzes.length} gespeicherte Quizze</div>
+            <div style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>
+              {quizzes.length} {quizzes.length === 1 ? 'Quiz' : 'Quizze'} gespeichert
             </div>
           </div>
+
+          {/* New quiz CTA */}
+          <button
+            onClick={() => onNavigate('generate')}
+            style={{
+              background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+              border: 'none', borderRadius: 12,
+              padding: '12px 22px', color: 'white',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >
+            ✦ Neues Quiz
+          </button>
         </div>
 
-        {/* Folders */}
+        {/* Folder filter */}
         {folders.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            <button onClick={() => setSelectedFolder(null)} style={css.chip(!selectedFolder)}>
-              Alle
-            </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+            <button
+              onClick={() => setSelectedFolder(null)}
+              style={{
+                padding: '6px 16px', borderRadius: 100,
+                border: `1px solid ${!selectedFolder ? C.indigo : C.border}`,
+                background: !selectedFolder ? `${C.indigo}18` : 'transparent',
+                color: !selectedFolder ? C.indigo : C.muted,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >Alle</button>
             {folders.map(f => (
-              <button key={f.id} onClick={() => setSelectedFolder(f.id)} style={css.chip(selectedFolder === f.id)}>
-                {Icon.folder} {f.name}
-              </button>
+              <button
+                key={f.id}
+                onClick={() => setSelectedFolder(f.id)}
+                style={{
+                  padding: '6px 16px', borderRadius: 100,
+                  border: `1px solid ${selectedFolder === f.id ? C.indigo : C.border}`,
+                  background: selectedFolder === f.id ? `${C.indigo}18` : 'transparent',
+                  color: selectedFolder === f.id ? C.indigo : C.muted,
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >⬡ {f.name}</button>
             ))}
           </div>
         )}
 
-        {/* Saved Quizzes */}
+        {/* Section label */}
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 11,
+          letterSpacing: '0.14em', color: C.muted,
+          textTransform: 'uppercase', marginBottom: 16,
+        }}>
+          Meine Quizze
+        </div>
+
+        {/* Empty state */}
         {filteredQuizzes.length === 0 ? (
-          <div style={{ ...css.card, textAlign: 'center', padding: 40 }}>
-            <p style={{ color: C.muted, fontSize: 16, marginBottom: 8 }}>Noch keine Quizze gespeichert.</p>
-            <p style={{ color: C.muted, fontSize: 14 }}>Generiere ein Quiz und speichere es hier.</p>
+          <div style={{
+            background: C.mid, border: `1px solid ${C.border}`,
+            borderRadius: 16, padding: '52px 32px',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 36, color: `${C.muted}55`, marginBottom: 16,
+            }}>✦</div>
+            <p style={{ color: C.chalk, fontWeight: 600, fontSize: 16, marginBottom: 8 }}>
+              Noch keine Quizze gespeichert
+            </p>
+            <p style={{ color: C.muted, fontSize: 14, marginBottom: 24 }}>
+              Generiere dein erstes Quiz und speichere es hier.
+            </p>
+            <button
+              onClick={() => onNavigate('generate')}
+              style={{
+                background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                border: 'none', borderRadius: 12,
+                padding: '12px 28px', color: 'white',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              ✦ Erstes Quiz erstellen
+            </button>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filteredQuizzes.map(q => (
               <div
                 key={q.id}
+                className="quiz-card"
                 style={{
-                  ...css.card,
-                  padding: 18,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
-                  cursor: 'pointer',
+                  background: C.mid,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14, padding: '18px 20px',
+                  display: 'flex', alignItems: 'center', gap: 16,
+                  cursor: 'pointer', position: 'relative',
                 }}
                 onClick={() => onNavigate('ready', { questions: q.questions, opts: q.opts })}
               >
+                {/* Icon */}
                 <div style={{
-                  width: 40, height: 40,
-                  background: `${C.indigo}22`,
-                  borderRadius: 10,
+                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  background: `${C.indigo}18`, border: `1px solid ${C.indigo}30`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 20, flexShrink: 0,
-                }}>
-                  📋
-                </div>
+                  fontFamily: "'DM Mono', monospace", fontSize: 18, color: C.indigo,
+                }}>✦</div>
+
+                {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{
+                    fontWeight: 700, fontSize: 15, marginBottom: 4,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    color: C.chalk,
+                  }}>
                     {q.title}
                   </div>
                   <div style={{ color: C.muted, fontSize: 13 }}>
-                    {q.questions?.length} Fragen · {new Date(q.created_at).toLocaleDateString('de-DE')}
+                    {q.questions?.length} Fragen
+                    {q.opts?.difficulty ? ` · ${q.opts.difficulty}` : ''}
+                    {q.opts?.level ? ` · ${q.opts.level}` : ''}
+                    {' · '}{new Date(q.created_at).toLocaleDateString('de-DE')}
                   </div>
                 </div>
-                <div style={{ color: C.muted }}>→</div>
+
+                {/* Arrow */}
+                <div style={{
+                  fontFamily: "'DM Mono', monospace",
+                  color: C.muted, fontSize: 16, flexShrink: 0,
+                }}>→</div>
+
+                {/* Delete button */}
+                <button
+                  className="del-btn"
+                  onClick={e => { e.stopPropagation(); handleDelete(q.id); }}
+                  disabled={deleting === q.id}
+                  style={{
+                    position: 'absolute', top: 12, right: 48,
+                    background: `${C.red}18`, border: `1px solid ${C.red}44`,
+                    borderRadius: 8, padding: '4px 10px',
+                    color: C.red, fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {deleting === q.id ? '…' : 'Löschen'}
+                </button>
               </div>
             ))}
           </div>
