@@ -560,7 +560,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const [file, setFile] = useState(null);
   const [count, setCount] = useState(10);
   const [difficulty, setDifficulty] = useState('gemischt');
-  const [level, setLevel] = useState('Gymnasium');
+  const [level, setLevel] = useState('Sekundarstufe 1');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
@@ -844,7 +844,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
             </div>
           </div>
 
-          {/* Difficulty + Level */}
+          {/* Difficulty + Level — dropdowns */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
             <div>
               <label style={{
@@ -852,21 +852,27 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
                 fontSize: 11, letterSpacing: '0.12em', color: C.muted,
                 textTransform: 'uppercase', marginBottom: 10,
               }}>Schwierigkeit</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {['einfach', 'gemischt', 'schwer'].map(d => (
-                  <button
-                    key={d} className="gen-chip"
-                    onClick={() => setDifficulty(d)}
-                    style={{
-                      padding: '8px 14px', borderRadius: 8, textAlign: 'left',
-                      border: `1px solid ${difficulty === d ? C.indigo : C.border}`,
-                      background: difficulty === d ? `${C.indigo}18` : 'transparent',
-                      color: difficulty === d ? C.chalk : C.muted,
-                      cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >{d.charAt(0).toUpperCase() + d.slice(1)}</button>
-                ))}
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={difficulty}
+                  onChange={e => setDifficulty(e.target.value)}
+                  style={{
+                    width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                    background: C.light, border: `1px solid ${C.border}`,
+                    borderRadius: 10, padding: '11px 40px 11px 14px',
+                    color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  <option value="einfach">Einfach</option>
+                  <option value="gemischt">Gemischt</option>
+                  <option value="schwer">Schwer</option>
+                </select>
+                <span style={{
+                  position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                  color: C.muted, pointerEvents: 'none', fontSize: 11,
+                  fontFamily: "'DM Mono', monospace",
+                }}>▾</span>
               </div>
             </div>
             <div>
@@ -875,21 +881,28 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
                 fontSize: 11, letterSpacing: '0.12em', color: C.muted,
                 textTransform: 'uppercase', marginBottom: 10,
               }}>Sprachniveau</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {['Grundschule', 'Gymnasium', 'Universität'].map(l => (
-                  <button
-                    key={l} className="gen-chip"
-                    onClick={() => setLevel(l)}
-                    style={{
-                      padding: '8px 14px', borderRadius: 8, textAlign: 'left',
-                      border: `1px solid ${level === l ? C.indigo : C.border}`,
-                      background: level === l ? `${C.indigo}18` : 'transparent',
-                      color: level === l ? C.chalk : C.muted,
-                      cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >{l}</button>
-                ))}
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={level}
+                  onChange={e => setLevel(e.target.value)}
+                  style={{
+                    width: '100%', appearance: 'none', WebkitAppearance: 'none',
+                    background: C.light, border: `1px solid ${C.border}`,
+                    borderRadius: 10, padding: '11px 40px 11px 14px',
+                    color: C.chalk, fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: 14, fontWeight: 500, cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  <option value="Grundschule">Grundschule</option>
+                  <option value="Sekundarstufe 1">Sekundarstufe 1</option>
+                  <option value="Sekundarstufe 2">Sekundarstufe 2</option>
+                  <option value="Universität">Universität</option>
+                </select>
+                <span style={{
+                  position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                  color: C.muted, pointerEvents: 'none', fontSize: 11,
+                  fontFamily: "'DM Mono', monospace",
+                }}>▾</span>
               </div>
             </div>
           </div>
@@ -960,6 +973,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
   const [qrUrl, setQrUrl] = useState('');
   const [sharing, setSharing] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showSoloShare, setShowSoloShare] = useState(false); // NEW: solo PIN screen
   const [saveModal, setSaveModal] = useState(false);
   const [saveTitle, setSaveTitle] = useState(opts?.topic || 'Mein Quiz');
   const [folders, setFolders] = useState([]);
@@ -1111,7 +1125,27 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
             <button
               key={m.id}
               className="mode-card"
-              onClick={() => onStartQuiz(questions, m.id, opts)}
+              onClick={() => {
+                if (m.id === 'solo') {
+                  // Generate PIN first, then show sharing screen
+                  setSharing(true);
+                  fetch('/.netlify/functions/create-quiz-session', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ questions, opts }),
+                  })
+                  .then(r => r.json())
+                  .then(data => {
+                    setPin(data.pin);
+                    const appUrl = `${window.location.origin}?pin=${data.pin}`;
+                    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(appUrl)}`);
+                    setShowSoloShare(true);
+                  })
+                  .catch(e => showToast('PIN konnte nicht erstellt werden. Supabase konfiguriert?', 'error'))
+                  .finally(() => setSharing(false));
+                } else {
+                  onStartQuiz(questions, m.id, opts);
+                }
+              }}
               style={{
                 background: C.mid,
                 border: `1px solid ${C.border}`,
@@ -1140,6 +1174,98 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
           ))}
         </div>
       </div>
+
+      {/* ── Solo PIN Screen (full page overlay) ── */}
+      {showSoloShare && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 500,
+          background: C.navy,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }}>
+          {/* Header */}
+          <div style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.16em', color: C.indigo,
+            textTransform: 'uppercase', marginBottom: 12,
+          }}>
+            Schüler beitreten lassen
+          </div>
+          <h2 style={{ fontSize: 'clamp(22px, 4vw, 30px)', fontWeight: 700, marginBottom: 6, textAlign: 'center' }}>
+            Jeder für sich
+          </h2>
+          <p style={{ color: C.muted, fontSize: 15, marginBottom: 40, textAlign: 'center', maxWidth: 400 }}>
+            Schüler scannen den QR-Code oder geben den PIN auf der Startseite ein.
+          </p>
+
+          {/* QR Code */}
+          {qrUrl && (
+            <div style={{
+              background: 'white', borderRadius: 20, padding: 16,
+              marginBottom: 28, boxShadow: `0 0 0 1px ${C.border}`,
+            }}>
+              <img src={qrUrl} alt="QR-Code" style={{ width: 200, height: 200, display: 'block' }} />
+            </div>
+          )}
+
+          {/* PIN */}
+          <div style={{
+            background: C.mid, border: `1px solid ${C.border}`,
+            borderRadius: 16, padding: '20px 40px',
+            marginBottom: 12, textAlign: 'center',
+          }}>
+            <div style={{
+              fontFamily: "'DM Mono', monospace", fontSize: 11,
+              letterSpacing: '0.14em', color: C.muted,
+              textTransform: 'uppercase', marginBottom: 8,
+            }}>PIN</div>
+            <div style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: 52, fontWeight: 700,
+              color: C.indigo, letterSpacing: 10, lineHeight: 1,
+            }}>
+              {pin}
+            </div>
+          </div>
+
+          <p style={{ color: C.muted, fontSize: 13, marginBottom: 36 }}>
+            quizblatt.netlify.app · PIN eingeben
+          </p>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => setShowSoloShare(false)}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`, borderRadius: 12,
+                padding: '12px 24px', color: C.muted,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              ← Zurück
+            </button>
+            <button
+              onClick={() => {
+                setShowSoloShare(false);
+                onStartQuiz(questions, 'solo', opts);
+              }}
+              style={{
+                background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                border: 'none', borderRadius: 12,
+                padding: '12px 32px', color: 'white',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700, fontSize: 15, cursor: 'pointer',
+                minWidth: 200,
+              }}
+            >
+              Quiz starten  →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Share Modal */}
       <Modal open={showShare} onClose={() => setShowShare(false)} title="Quiz teilen">
@@ -1398,8 +1524,13 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
     <div style={{ ...css.app, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <style>{`
         @media (max-width: 580px) { .opt-grid { grid-template-columns: 1fr !important; } }
-        .opt-btn { transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease; }
-        .opt-btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .opt-btn { transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease; }
+        .opt-btn:hover:not(:disabled) {
+          transform: translateY(-3px) scale(1.012) !important;
+          border-color: #5B6EF5 !important;
+          background: rgba(91,110,245,0.13) !important;
+          box-shadow: 0 8px 28px rgba(91,110,245,0.28) !important;
+        }
       `}</style>
 
       {/* Top bar */}
