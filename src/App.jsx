@@ -573,17 +573,32 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
         body.content = topic;
       }
 
-      const res = await fetch('/.netlify/functions/generate-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      // Split into batches of max 5 to avoid timeouts
+      const BATCH = 5;
+      const batches = [];
+      let remaining = count;
+      while (remaining > 0) {
+        batches.push(Math.min(BATCH, remaining));
+        remaining -= BATCH;
+      }
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
+      let allQuestions = [];
+      for (let i = 0; i < batches.length; i++) {
+        const batchBody = { ...body, count: batches[i] };
+        const res = await fetch('/.netlify/functions/generate-quiz', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batchBody),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
+        allQuestions = allQuestions.concat(data.questions || []);
+        // Update progress between batches
+        setProgress(Math.min(88, 20 + (i + 1) * (65 / batches.length)));
+      }
 
       stopProgress();
-      onQuizReady(data.questions, { count, difficulty, level, topic: topic || file?.name || 'Generiert' });
+      onQuizReady(allQuestions, { count, difficulty, level, topic: topic || file?.name || 'Generiert' });
     } catch (e) {
       stopProgress();
       setError(e.message);
