@@ -5,6 +5,10 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  included_files = []
+
+[functions."generate-quiz"]
+  timeout = 30
 
 [[redirects]]
   from = "/*"
