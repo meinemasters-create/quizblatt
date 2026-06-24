@@ -1024,7 +1024,10 @@ function QuizReadyScreen({ questions, opts, onNavigate, onStartQuiz, user, showT
 }
 
 // ─── SCREEN: Quiz Play ────────────────────────────────────────────────────────
-function QuizPlayScreen({ questions, mode, opts, onNavigate, showToast }) {
+function QuizPlayScreen({ questions: questionsProp, mode, opts, onNavigate, showToast }) {
+  const questions = (questionsProp && questionsProp.length > 0)
+    ? questionsProp
+    : (window.__lastQuizData && window.__lastQuizData.questions) || [];
   const shuffled = useRef(questions.map(shuffleAnswers));
   const [current, setCurrent] = useState(0);
   const [selected, setSelected] = useState(null);
@@ -1549,7 +1552,9 @@ export default function App() {
   };
 
   const startQuiz = (questions, mode, opts) => {
-    setQuizData({ questions, mode, opts });
+    const safeQuestions = questions || [];
+    window.__lastQuizData = { questions: safeQuestions, mode, opts };
+    setQuizData({ questions: safeQuestions, mode, opts });
     setScreen('play');
   };
 
