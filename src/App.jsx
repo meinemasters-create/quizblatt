@@ -289,115 +289,170 @@ function Toast({ message, type = 'info', onDone }) {
 
 // ─── SCREEN: Home ─────────────────────────────────────────────────────────────
 function HomeScreen({ onNavigate, user }) {
+  const SCHOOL = 'Robert-Schuman-Schule';
+
   const tiles = [
     {
       id: 'account',
-      icon: Icon.account,
+      emoji: '👤',
       label: 'Account',
-      sublabel: user ? user.email.split('@')[0] : 'Anmelden',
+      desc: 'Anmelden und Quizzes dauerhaft speichern',
       color: C.purple,
     },
     {
       id: 'join',
-      icon: Icon.join,
-      label: 'Beitreten',
-      sublabel: 'PIN eingeben',
-      color: C.teal,
+      emoji: '🔑',
+      label: 'Quiz beitreten',
+      desc: 'PIN von der Lehrkraft eingeben und mitspielen',
+      color: C.amber,
     },
     {
       id: 'generate',
-      icon: Icon.quiz,
-      label: 'Generieren',
-      sublabel: 'Quiz erstellen',
+      emoji: '✦',
+      label: 'Quiz generieren',
+      desc: 'Aus PDF, Foto oder Thema ein neues Quiz erstellen',
       color: C.indigo,
     },
   ];
 
   return (
     <div style={{ ...css.app, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <style>{`
+        @media (max-width: 600px) {
+          .home-tiles { grid-template-columns: 1fr !important; }
+        }
+        .home-tile:hover { transform: translateY(-4px) !important; }
+      `}</style>
+
       {/* Header */}
       <div style={{
-        padding: '40px 20px 0',
+        padding: '52px 24px 0',
         textAlign: 'center',
-        background: `linear-gradient(180deg, ${C.mid} 0%, transparent 100%)`,
       }}>
+        {/* School label */}
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 10,
-          background: `${C.indigo}1a`, border: `1px solid ${C.indigo}44`,
-          borderRadius: 100, padding: '6px 16px', marginBottom: 20,
+          fontFamily: "'DM Mono', monospace",
+          fontSize: 12,
+          fontWeight: 500,
+          letterSpacing: '0.18em',
+          color: C.indigo,
+          textTransform: 'uppercase',
+          marginBottom: 18,
         }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill={C.indigo}>
-            <circle cx="7" cy="7" r="6.5" fill={`${C.indigo}33`} stroke={C.indigo} strokeWidth="1"/>
-            <path d="M5 7l2 2 3-3" stroke={C.indigo} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span style={{ fontSize: 12, color: C.indigo, fontWeight: 600, fontFamily: "'DM Mono', monospace" }}>
-            KI-gestützt · Offline-fähig
+          {SCHOOL}
+        </div>
+
+        {/* Main title */}
+        <h1 style={{
+          fontSize: 'clamp(32px, 6vw, 52px)',
+          fontWeight: 700,
+          lineHeight: 1.05,
+          marginBottom: 16,
+          letterSpacing: '-0.02em',
+        }}>
+          RSB Quiz<span style={{ color: C.indigo }}>blatt</span> Generator
+        </h1>
+
+        <p style={{ color: C.muted, fontSize: 17, maxWidth: 420, margin: '0 auto 36px' }}>
+          KI-gestützter Quiz-Generator für den Unterricht
+        </p>
+
+        {/* Auth banner */}
+        <div
+          onClick={() => onNavigate('account')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            maxWidth: 560,
+            margin: '0 auto 40px',
+            background: C.mid,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            padding: '14px 20px',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = C.indigo}
+          onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="7" r="3.5" stroke={C.muted} strokeWidth="1.5"/>
+              <path d="M2 16c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span style={{ color: C.muted, fontSize: 15 }}>
+              {user ? user.email : 'Noch nicht angemeldet'}
+            </span>
+          </div>
+          <span style={{ color: C.muted, fontSize: 14 }}>
+            {user ? 'Mein Account →' : 'Anmelden →'}
           </span>
         </div>
-        <h1 style={{ fontSize: 'clamp(28px, 5vw, 42px)', fontWeight: 700, lineHeight: 1.1, marginBottom: 12 }}>
-          Quizblatt
-          <span style={{ color: C.indigo }}> Generator</span>
-        </h1>
-        <p style={{ color: C.muted, fontSize: 16, maxWidth: 400, margin: '0 auto 40px' }}>
-          Erstelle in Sekunden individuelle Quizze aus PDFs, Fotos oder einem Thema.
-        </p>
       </div>
 
       {/* Tiles */}
-      <div style={{
-        ...css.container,
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 16,
-        padding: '0 20px 40px',
-        maxWidth: 920,
-      }}>
+      <div
+        className="home-tiles"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 16,
+          padding: '0 24px 48px',
+          maxWidth: 900,
+          margin: '0 auto',
+          width: '100%',
+        }}
+      >
         {tiles.map(tile => (
           <button
             key={tile.id}
+            className="home-tile"
             onClick={() => onNavigate(tile.id)}
             style={{
               background: C.mid,
               border: `1px solid ${C.border}`,
               borderRadius: 20,
-              padding: '28px 16px',
+              padding: '36px 24px 28px',
               cursor: 'pointer',
               textAlign: 'center',
-              transition: 'transform 0.15s, border-color 0.15s, box-shadow 0.15s',
+              transition: 'transform 0.18s ease, border-color 0.18s, box-shadow 0.18s',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 12,
+              gap: 0,
             }}
             onMouseEnter={e => {
               e.currentTarget.style.borderColor = tile.color;
-              e.currentTarget.style.transform = 'translateY(-3px)';
-              e.currentTarget.style.boxShadow = `0 12px 32px ${tile.color}22`;
+              e.currentTarget.style.boxShadow = `0 16px 40px ${tile.color}28`;
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.transform = 'none';
               e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'none';
             }}
           >
-            <div style={{ fontSize: 36 }}>{tile.icon}</div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 17 }}>{tile.label}</div>
-              <div style={{ color: C.muted, fontSize: 13, marginTop: 4 }}>{tile.sublabel}</div>
+            <div style={{
+              fontSize: tile.emoji === '✦' ? 40 : 44,
+              marginBottom: 20,
+              lineHeight: 1,
+              color: tile.emoji === '✦' ? tile.color : 'inherit',
+            }}>
+              {tile.emoji}
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 10, color: C.chalk }}>
+              {tile.label}
+            </div>
+            <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+              {tile.desc}
             </div>
           </button>
         ))}
       </div>
 
-      <style>{`
-        @media (max-width: 480px) {
-          .home-tiles { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
       {/* Footer */}
-      <div style={{ textAlign: 'center', padding: '20px', marginTop: 'auto' }}>
-        <p style={{ color: C.muted, fontSize: 12 }}>
+      <div style={{ textAlign: 'center', padding: '0 0 28px', marginTop: 'auto' }}>
+        <p style={{ color: `${C.muted}88`, fontSize: 12, letterSpacing: '0.04em' }}>
           Powered by Claude AI · Für den Schulbetrieb
         </p>
       </div>
