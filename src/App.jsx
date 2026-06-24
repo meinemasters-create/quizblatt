@@ -628,32 +628,44 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
         body.content = topic;
       }
 
-      // Split into batches of max 5 to avoid timeouts
-      const BATCH = 5;
-      const batches = [];
-      let remaining = count;
-      while (remaining > 0) {
-        batches.push(Math.min(BATCH, remaining));
-        remaining -= BATCH;
-      }
-
       let allQuestions = [];
-      for (let i = 0; i < batches.length; i++) {
-        const batchBody = { ...body, count: batches[i] };
+
+      if (file) {
+        // PDF/Image: single request (can't split file across batches)
+        // Limit to 10 questions max to stay within timeout
+        const safeCount = Math.min(count, 10);
         const res = await fetch('/.netlify/functions/generate-quiz', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batchBody),
+          body: JSON.stringify({ ...body, count: safeCount }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
-        allQuestions = allQuestions.concat(data.questions || []);
-        // Update progress between batches
-        setProgress(Math.min(88, 20 + (i + 1) * (65 / batches.length)));
+        allQuestions = data.questions || [];
+      } else {
+        // Text: split into batches of 5 to avoid timeouts
+        const BATCH = 5;
+        const batches = [];
+        let remaining = count;
+        while (remaining > 0) {
+          batches.push(Math.min(BATCH, remaining));
+          remaining -= BATCH;
+        }
+        for (let i = 0; i < batches.length; i++) {
+          const res = await fetch('/.netlify/functions/generate-quiz', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, count: batches[i] }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
+          allQuestions = allQuestions.concat(data.questions || []);
+          setProgress(Math.min(88, 20 + (i + 1) * (65 / batches.length)));
+        }
       }
 
       stopProgress();
-      onQuizReady(allQuestions, { count, difficulty, level, topic: topic || file?.name || 'Generiert' });
+      onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert' });
     } catch (e) {
       stopProgress();
       setError(e.message);
