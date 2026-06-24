@@ -1,39 +1,33 @@
-export default async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+exports.handler = async function(event, context) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers, body: '' };
   }
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return new Response(
-      JSON.stringify({ error: 'Supabase-Konfiguration fehlt in den Umgebungsvariablen.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Supabase-Konfiguration fehlt.' }) };
   }
 
   let body;
   try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: 'Ungültiger Request-Body' }), { status: 400 });
+    body = JSON.parse(event.body);
+  } catch (e) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Ungültiger Request-Body' }) };
   }
 
   const { questions, opts } = body;
-
-  // Generate random 6-digit PIN
   const pin = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
@@ -53,16 +47,8 @@ export default async (req) => {
       throw new Error(err);
     }
 
-    return new Response(JSON.stringify({ pin }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return { statusCode: 200, headers, body: JSON.stringify({ pin }) };
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: 'Quiz konnte nicht gespeichert werden.', detail: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Quiz konnte nicht gespeichert werden.', detail: err.message }) };
   }
 };
-
-export const config = { path: '/api/create-quiz-session' };

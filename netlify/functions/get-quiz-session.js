@@ -1,72 +1,48 @@
-export default async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
+exports.handler = async function(event, context) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers, body: '' };
   }
 
-  if (req.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+  if (event.httpMethod !== 'GET') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return new Response(
-      JSON.stringify({ error: 'Supabase-Konfiguration fehlt in den Umgebungsvariablen.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Supabase-Konfiguration fehlt.' }) };
   }
 
-  const url = new URL(req.url);
-  const pin = url.searchParams.get('pin');
+  const pin = event.queryStringParameters && event.queryStringParameters.pin;
 
   if (!pin || !/^\d{6}$/.test(pin)) {
-    return new Response(JSON.stringify({ error: 'Ungültiger PIN. Bitte 6-stelligen PIN eingeben.' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Ungültiger PIN.' }) };
   }
 
   try {
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/quiz_sessions?pin=eq.${pin}&select=questions,opts`,
-      {
-        headers: {
-          apikey: supabaseKey,
-          Authorization: `Bearer ${supabaseKey}`,
-        },
-      }
-    );
+    const response = await fetch(`${supabaseUrl}/rest/v1/quiz_sessions?pin=eq.${pin}&select=questions,opts`, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+    });
 
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
+    if (!response.ok) throw new Error(await response.text());
 
     const rows = await response.json();
     if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ error: `PIN ${pin} nicht gefunden. Bitte prüfe die Eingabe.` }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return { statusCode: 404, headers, body: JSON.stringify({ error: `PIN ${pin} nicht gefunden.` }) };
     }
 
-    return new Response(JSON.stringify({ questions: rows[0].questions, opts: rows[0].opts }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return { statusCode: 200, headers, body: JSON.stringify({ questions: rows[0].questions, opts: rows[0].opts }) };
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: 'Quiz konnte nicht geladen werden.', detail: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return { statusCode: 500, headers, body: JSON.stringify({ error: 'Quiz konnte nicht geladen werden.', detail: err.message }) };
   }
 };
-
-export const config = { path: '/api/get-quiz-session' };
