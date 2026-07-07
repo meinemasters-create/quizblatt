@@ -949,8 +949,11 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
       if (data) folderId = data.id;
     }
     const { error } = await supabase.from('saved_quizzes').insert({ user_id: user.id, folder_id: folderId, title: saveTitle, questions, opts });
-    if (error) showToast('Fehler beim Speichern', 'error');
-    else { showToast('Quiz gespeichert!', 'success'); setSaveModal(false); }
+    if (error) {
+      console.error('Supabase save error:', error);
+      const msg = (error.message || error.code || 'Unbekannt');
+      showToast('Fehler: ' + msg, 'error');
+    } else { showToast('Quiz gespeichert!', 'success'); setSaveModal(false); }
   };
 
   const modes = [
