@@ -287,6 +287,50 @@ function Toast({ message, type = 'info', onDone }) {
   );
 }
 
+// ─── COMPONENT: UserBar (persistent top-right account button) ────────────────
+function UserBar({ user, onNavigate }) {
+  if (!user) return null;
+  return (
+    <div style={{
+      position: 'fixed', top: 12, right: 16, zIndex: 200,
+    }}>
+      <button
+        onClick={() => onNavigate('account')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: C.mid, border: `1px solid ${C.border}`,
+          borderRadius: 100, padding: '7px 14px 7px 10px',
+          cursor: 'pointer', color: C.chalk,
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 600, fontSize: 13,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
+          transition: 'border-color 0.15s, box-shadow 0.15s',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = C.indigo;
+          e.currentTarget.style.boxShadow = `0 4px 20px ${C.indigo}33`;
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = C.border;
+          e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.3)';
+        }}
+      >
+        <div style={{
+          width: 24, height: 24, borderRadius: '50%',
+          background: `${C.indigo}30`, border: `1.5px solid ${C.indigo}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'DM Mono', monospace",
+          fontSize: 11, fontWeight: 700, color: C.indigo,
+          flexShrink: 0,
+        }}>
+          {user.email[0].toUpperCase()}
+        </div>
+        Mein Konto
+      </button>
+    </div>
+  );
+}
+
 // ─── SCREEN: Home ─────────────────────────────────────────────────────────────
 function HomeScreen({ onNavigate, user }) {
   const SCHOOL = 'Robert-Schuman-Schule';
@@ -1702,6 +1746,7 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [quizzes, setQuizzes] = useState([]);
@@ -1722,6 +1767,10 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
 
   const handleAuth = async () => {
     if (!supabase) { setError('Supabase ist nicht konfiguriert.'); return; }
+    if (mode === 'register') {
+      if (password.length < 6) { setError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return; }
+      if (password !== confirm) { setError('Die Passwörter stimmen nicht überein.'); return; }
+    }
     setLoading(true); setError('');
     try {
       const result = mode === 'login'
@@ -1818,7 +1867,7 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
               type="password"
               style={{
                 ...css.input,
-                marginBottom: error ? 10 : 24,
+                marginBottom: mode === 'register' ? 16 : (error ? 10 : 24),
                 transition: 'border-color 0.15s',
               }}
               placeholder="Mindestens 6 Zeichen"
@@ -1826,6 +1875,30 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
               onChange={e => { setPassword(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleAuth()}
             />
+
+            {mode === 'register' && (
+              <>
+                <label style={{
+                  display: 'block', fontFamily: "'DM Mono', monospace",
+                  fontSize: 11, letterSpacing: '0.12em', color: C.muted,
+                  textTransform: 'uppercase', marginBottom: 8,
+                }}>Passwort bestätigen</label>
+                <input
+                  className="auth-input"
+                  type="password"
+                  style={{
+                    ...css.input,
+                    marginBottom: error ? 10 : 24,
+                    transition: 'border-color 0.15s',
+                    borderColor: confirm && confirm !== password ? C.red : C.border,
+                  }}
+                  placeholder="Passwort wiederholen"
+                  value={confirm}
+                  onChange={e => { setConfirm(e.target.value); setError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleAuth()}
+                />
+              </>
+            )}
 
             {error && (
               <div style={{
@@ -1854,7 +1927,7 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
             </button>
 
             <button
-              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
+              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setConfirm(''); setPassword(''); }}
               style={{
                 width: '100%', padding: '12px',
                 background: 'transparent', border: `1px solid ${C.border}`,
@@ -2210,6 +2283,10 @@ export default function App() {
   return (
     <>
       {renderScreen()}
+      {/* Persistent account button — shown on all screens when logged in, except on account screen itself */}
+      {screen !== 'account' && (
+        <UserBar user={user} onNavigate={navigate} />
+      )}
       {toast && (
         <Toast
           key={toast.id}
