@@ -489,9 +489,31 @@ function HomeScreen({ onNavigate, user }) {
 
       {/* Footer */}
       <div style={{ textAlign: 'center', padding: '0 0 28px', marginTop: 'auto' }}>
-        <p style={{ color: `${C.muted}88`, fontSize: 12, letterSpacing: '0.04em' }}>
-          Powered by Claude AI · Für den Schulbetrieb
+        <p style={{ color: `${C.muted}66`, fontSize: 12, letterSpacing: '0.04em', marginBottom: 8 }}>
+          © {new Date().getFullYear()} Tim Stahlberg · Powered by Claude AI
         </p>
+        <div style={{ display: 'flex', gap: 20, justifyContent: 'center' }}>
+          <button
+            onClick={() => onNavigate('impressum')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: `${C.muted}88`, fontSize: 11,
+              fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',
+              textTransform: 'uppercase', padding: 0,
+              textDecoration: 'underline', textUnderlineOffset: 3,
+            }}
+          >Impressum</button>
+          <button
+            onClick={() => onNavigate('datenschutz')}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: `${C.muted}88`, fontSize: 11,
+              fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',
+              textTransform: 'uppercase', padding: 0,
+              textDecoration: 'underline', textUnderlineOffset: 3,
+            }}
+          >Datenschutz</button>
+        </div>
       </div>
     </div>
   );
@@ -2178,6 +2200,159 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
   );
 }
 
+// ─── SCREEN: Impressum ────────────────────────────────────────────────────────
+function ImpressumScreen({ onNavigate }) {
+  const linkStyle = {
+    color: C.indigo, textDecoration: 'none', fontWeight: 600,
+  };
+  const h2Style = {
+    fontSize: 15, fontWeight: 700, color: C.chalk,
+    marginTop: 28, marginBottom: 8,
+    fontFamily: "'DM Mono', monospace",
+    letterSpacing: '0.08em', textTransform: 'uppercase',
+  };
+  const pStyle = { color: C.muted, fontSize: 14, lineHeight: 1.8, marginBottom: 4 };
+
+  return (
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '36px 24px 80px' }}>
+        <button onClick={() => onNavigate('home')} style={{
+          background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
+          fontSize: 12, fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em',
+          textTransform: 'uppercase', padding: 0, marginBottom: 36,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>← Startseite</button>
+
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase', marginBottom: 10 }}>
+          Rechtliches
+        </div>
+        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.02em' }}>Impressum</h1>
+        <p style={{ color: C.muted, fontSize: 14, marginBottom: 32 }}>
+          Angaben gemäß § 5 TMG
+        </p>
+
+        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: '24px 28px' }}>
+          <div style={h2Style}>Verantwortlich</div>
+          <p style={pStyle}>Tim Stahlberg</p>
+          <p style={pStyle}>Am Landgraben 2</p>
+          <p style={pStyle}>76532 Baden-Baden</p>
+
+          <div style={h2Style}>Kontakt</div>
+          <p style={pStyle}>
+            E-Mail: <a href="mailto:tim.stahlberg@outlook.de" style={linkStyle}>tim.stahlberg@outlook.de</a>
+          </p>
+
+          <div style={h2Style}>Urheberrecht</div>
+          <p style={pStyle}>
+            © {new Date().getFullYear()} Tim Stahlberg. Alle Rechte vorbehalten.
+          </p>
+          <p style={pStyle}>
+            Die durch den Seitenbetreiber erstellten Inhalte und Werke auf dieser Website unterliegen dem deutschen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechts bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+          </p>
+
+          <div style={h2Style}>Haftungsausschluss</div>
+          <p style={pStyle}>
+            Die durch diese App generierten Quizinhalte werden mithilfe von KI-Technologie (Anthropic Claude) erstellt. Für die inhaltliche Richtigkeit der generierten Fragen und Antworten wird keine Gewähr übernommen. Die Inhalte sollten vor dem Einsatz im Unterricht auf Korrektheit geprüft werden.
+          </p>
+
+          <div style={h2Style}>Externe Dienste</div>
+          <p style={pStyle}>
+            Diese App nutzt folgende externe Dienste: Anthropic Claude API (KI-Generierung), Supabase (Datenbank & Authentifizierung), Netlify (Hosting).
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SCREEN: Datenschutz ───────────────────────────────────────────────────────
+function DatenschutzScreen({ onNavigate }) {
+  const h2Style = {
+    fontSize: 15, fontWeight: 700, color: C.chalk,
+    marginTop: 28, marginBottom: 8,
+    fontFamily: "'DM Mono', monospace",
+    letterSpacing: '0.08em', textTransform: 'uppercase',
+  };
+  const pStyle = { color: C.muted, fontSize: 14, lineHeight: 1.8, marginBottom: 8 };
+  const linkStyle = { color: C.indigo, textDecoration: 'none', fontWeight: 600 };
+
+  return (
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '36px 24px 80px' }}>
+        <button onClick={() => onNavigate('home')} style={{
+          background: 'none', border: 'none', cursor: 'pointer', color: C.muted,
+          fontSize: 12, fontFamily: "'DM Mono', monospace", letterSpacing: '0.08em',
+          textTransform: 'uppercase', padding: 0, marginBottom: 36,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>← Startseite</button>
+
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase', marginBottom: 10 }}>
+          Rechtliches
+        </div>
+        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 4, letterSpacing: '-0.02em' }}>Datenschutzerklärung</h1>
+        <p style={{ color: C.muted, fontSize: 14, marginBottom: 32 }}>
+          Stand: {new Date().toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}
+        </p>
+
+        <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: '24px 28px' }}>
+
+          <div style={h2Style}>Verantwortlicher</div>
+          <p style={pStyle}>
+            Tim Stahlberg, Am Landgraben 2, 76532 Baden-Baden<br/>
+            E-Mail: <a href="mailto:tim.stahlberg@outlook.de" style={linkStyle}>tim.stahlberg@outlook.de</a>
+          </p>
+
+          <div style={h2Style}>Welche Daten werden erfasst?</div>
+          <p style={pStyle}>
+            <strong style={{ color: C.chalk }}>Bei Nutzung ohne Konto:</strong> Es werden keine personenbezogenen Daten gespeichert. Eingegebene Texte, hochgeladene PDFs und Fotos werden ausschließlich zur KI-Generierung an die Anthropic Claude API übermittelt und nicht dauerhaft gespeichert.
+          </p>
+          <p style={pStyle}>
+            <strong style={{ color: C.chalk }}>Bei Registrierung mit Konto:</strong> Es wird lediglich die E-Mail-Adresse sowie ein verschlüsseltes Passwort gespeichert. Zusätzlich werden die vom Nutzer gespeicherten Quizze in der Datenbank abgelegt.
+          </p>
+
+          <div style={h2Style}>Zweck der Datenverarbeitung</div>
+          <p style={pStyle}>
+            Die E-Mail-Adresse dient ausschließlich der Authentifizierung (Anmeldung) und der Zuordnung gespeicherter Quizze zum jeweiligen Nutzerkonto. Eine Nutzung für Werbezwecke oder eine Weitergabe an Dritte findet nicht statt.
+          </p>
+
+          <div style={h2Style}>Externe Dienste & Datenübermittlung</div>
+          <p style={pStyle}>
+            <strong style={{ color: C.chalk }}>Anthropic Claude API:</strong> Eingegebene Texte, Themen sowie hochgeladene PDFs und Bilder werden zur Fragengeneration an Anthropic (USA) übermittelt. Anthropic verarbeitet diese Daten gemäß ihrer{' '}
+            <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" style={linkStyle}>Datenschutzrichtlinie</a>.
+          </p>
+          <p style={pStyle}>
+            <strong style={{ color: C.chalk }}>Supabase:</strong> Nutzerkonten und gespeicherte Quizze werden bei Supabase Inc. (USA) gespeichert. Die Datenübertragung erfolgt verschlüsselt (TLS). Weitere Informationen:{' '}
+            <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" style={linkStyle}>supabase.com/privacy</a>.
+          </p>
+          <p style={pStyle}>
+            <strong style={{ color: C.chalk }}>Netlify:</strong> Das Hosting der App erfolgt über Netlify Inc. (USA). Beim Aufruf der Website werden technisch notwendige Zugriffsdaten (IP-Adresse, Zeitstempel) in Server-Logs gespeichert. Weitere Informationen:{' '}
+            <a href="https://www.netlify.com/privacy/" target="_blank" rel="noopener noreferrer" style={linkStyle}>netlify.com/privacy</a>.
+          </p>
+
+          <div style={h2Style}>Speicherdauer</div>
+          <p style={pStyle}>
+            Nutzerdaten (E-Mail, gespeicherte Quizze) werden so lange gespeichert, wie das Konto aktiv ist. Eine Löschung des Kontos kann jederzeit durch Kontaktaufnahme per E-Mail beantragt werden.
+          </p>
+
+          <div style={h2Style}>Ihre Rechte</div>
+          <p style={pStyle}>
+            Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten (Art. 15–18 DSGVO) sowie ein Widerspruchsrecht (Art. 21 DSGVO). Wenden Sie sich dazu an:{' '}
+            <a href="mailto:tim.stahlberg@outlook.de" style={linkStyle}>tim.stahlberg@outlook.de</a>.
+          </p>
+          <p style={pStyle}>
+            Sie haben zudem das Recht, sich bei einer Datenschutzaufsichtsbehörde zu beschweren. Die zuständige Behörde in Baden-Württemberg ist der Landesbeauftragte für den Datenschutz und die Informationsfreiheit (LfDI Baden-Württemberg).
+          </p>
+
+          <div style={h2Style}>Cookies & Tracking</div>
+          <p style={pStyle}>
+            Diese App verwendet keine Tracking-Cookies und kein Web-Analyse-Tool. Es werden lediglich technisch notwendige Daten im Browser-Speicher (sessionStorage) abgelegt, die beim Schließen des Tabs automatisch gelöscht werden.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -2275,6 +2450,10 @@ export default function App() {
             showToast={showToast}
           />
         );
+      case 'impressum':
+        return <ImpressumScreen onNavigate={navigate} />;
+      case 'datenschutz':
+        return <DatenschutzScreen onNavigate={navigate} />;
       default:
         return <HomeScreen onNavigate={navigate} user={user} />;
     }
