@@ -2724,7 +2724,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Check for PIN in URL — auto-load quiz directly, skip join screen
+    // Check for PIN in URL — load quiz directly, bypass join screen
     const params = new URLSearchParams(window.location.search);
     const urlPin = params.get('pin');
     if (urlPin && /^\d{6}$/.test(urlPin)) {
@@ -2732,7 +2732,12 @@ export default function App() {
         .then(r => r.json())
         .then(data => {
           if (data.questions && data.questions.length > 0) {
-            goPlay(data.questions, 'solo', data.opts);
+            // Write directly — don't call goPlay (closure issue)
+            const pd = { questions: data.questions, mode: 'solo', opts: data.opts };
+            sessionStorage.setItem('quizPlay', JSON.stringify(pd));
+            quizRef.current = pd;
+            setPlayData(pd);      // triggers re-render with data
+            setScreen('play');
           } else {
             setScreen('join');
           }
@@ -2740,7 +2745,7 @@ export default function App() {
         .catch(() => setScreen('join'));
     }
 
-    // Auth listener
+    // Auth listener — always runs
     if (supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) setUser(session.user);
