@@ -2711,28 +2711,33 @@ export default function App() {
   const [screen, setScreen] = useState('home');
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
-  // Use a ref so quiz data is NEVER lost between renders or state updates
   const quizRef = useRef({ questions: [], mode: null, opts: null });
+  // Separate state for play data so React re-renders with correct data
+  const [playData, setPlayData] = useState(null);
+
+  const goPlay = (questions, mode, opts) => {
+    const data = { questions, mode, opts };
+    sessionStorage.setItem('quizPlay', JSON.stringify(data));
+    quizRef.current = data;
+    setPlayData(data);
+    setScreen('play');
+  };
 
   useEffect(() => {
     // Check for PIN in URL — auto-load quiz directly, skip join screen
     const params = new URLSearchParams(window.location.search);
     const urlPin = params.get('pin');
     if (urlPin && /^\d{6}$/.test(urlPin)) {
-      // Fetch quiz directly and start playing
       fetch(`/.netlify/functions/get-quiz-session?pin=${urlPin}`)
         .then(r => r.json())
         .then(data => {
           if (data.questions && data.questions.length > 0) {
-            const playData = { questions: data.questions, mode: 'solo', opts: data.opts };
-            sessionStorage.setItem('quizPlay', JSON.stringify(playData));
-            quizRef.current = playData;
-            setScreen('play');
+            goPlay(data.questions, 'solo', data.opts);
           } else {
-            setScreen('join'); // Fallback to join screen if no questions
+            setScreen('join');
           }
         })
-        .catch(() => setScreen('join')); // Fallback on error
+        .catch(() => setScreen('join'));
     }
 
     // Auth listener
@@ -2760,17 +2765,12 @@ export default function App() {
   };
 
   const startQuiz = (questions, mode, opts) => {
-    // Always pull from sessionStorage as the source of truth
     const stored = JSON.parse(sessionStorage.getItem('quizData') || '{}');
     const safeQ = (questions && questions.length > 0)
       ? questions
       : (stored.questions && stored.questions.length > 0 ? stored.questions : []);
     const safeOpts = (opts && Object.keys(opts).length > 0) ? opts : stored.opts;
-    const playData = { questions: safeQ, mode, opts: safeOpts };
-    sessionStorage.setItem('quizPlay', JSON.stringify(playData));
-    quizRef.current = playData;
-    // Force screen update AFTER data is stored
-    setTimeout(() => setScreen('play'), 0);
+    goPlay(safeQ, mode, safeOpts);
   };
 
   const onQuizReady = (questions, opts) => {
@@ -2817,16 +2817,22 @@ export default function App() {
             showToast={showToast}
           />
         );
-      case 'play':
+      case 'play': {
+        const pq = (playData && playData.questions && playData.questions.length > 0)
+          ? playData.questions
+          : questions;
+        const pm = (playData && playData.mode) ? playData.mode : mode;
+        const po = (playData && playData.opts) ? playData.opts : opts;
         return (
           <QuizPlayScreen
-            questions={questions}
-            mode={mode}
-            opts={opts}
+            questions={pq}
+            mode={pm}
+            opts={po}
             onNavigate={navigate}
             showToast={showToast}
           />
         );
+      }
       case 'account':
         return (
           <AccountScreen
