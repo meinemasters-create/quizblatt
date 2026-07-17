@@ -966,6 +966,359 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   );
 }
 
+// ─── SCREEN: Quiz Editor ──────────────────────────────────────────────────────
+function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDone }) {
+  const [questions, setQuestions] = useState(initialQuestions.map((q, i) => ({ ...q, _id: i })));
+  const [editIdx, setEditIdx] = useState(null); // which question is being edited
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // ── Edit state for the currently open question ────────────────────────────
+  const [editQ, setEditQ] = useState('');
+  const [editOpts, setEditOpts] = useState(['', '', '', '']);
+  const [editCorrect, setEditCorrect] = useState(0);
+  const [editExp, setEditExp] = useState('');
+
+  const openEdit = (idx) => {
+    const q = questions[idx];
+    setEditQ(q.question);
+    setEditOpts([...q.options]);
+    setEditCorrect(q.correct);
+    setEditExp(q.explanation);
+    setEditIdx(idx);
+  };
+
+  const saveEdit = () => {
+    if (!editQ.trim()) return;
+    setQuestions(qs => qs.map((q, i) => i === editIdx ? {
+      ...q,
+      question: editQ.trim(),
+      options: editOpts.map(o => o.trim()),
+      correct: editCorrect,
+      explanation: editExp.trim(),
+    } : q));
+    setEditIdx(null);
+  };
+
+  const deleteQuestion = (idx) => {
+    setQuestions(qs => qs.filter((_, i) => i !== idx));
+    setDeleteConfirm(null);
+  };
+
+  const LABELS = ['A', 'B', 'C', 'D'];
+  const answerColors = [
+    `${C.red}18`, `${C.indigo}18`, `${C.amber}18`, `${C.green}18`,
+  ];
+  const answerBorders = [C.red, C.indigo, C.amber, C.green];
+
+  return (
+    <div style={{ ...css.app, minHeight: '100vh' }}>
+      <style>{`
+        .eq-card { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+        .eq-card:hover { border-color: ${C.indigo}55 !important; }
+        .eq-edit-btn { transition: all 0.15s ease; opacity: 0; }
+        .eq-card:hover .eq-edit-btn { opacity: 1 !important; }
+        .eq-del-btn { transition: all 0.15s ease; opacity: 0; }
+        .eq-card:hover .eq-del-btn { opacity: 1 !important; }
+        .eq-opt-btn { transition: all 0.15s ease; cursor: pointer; }
+        .eq-opt-btn:hover { opacity: 0.85; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        background: C.mid, borderBottom: `1px solid ${C.border}`,
+        padding: '0 20px', height: 56,
+        display: 'flex', alignItems: 'center', gap: 16,
+        position: 'sticky', top: 0, zIndex: 100,
+      }}>
+        <button onClick={() => onNavigate('generate')} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace",
+          letterSpacing: '0.08em', textTransform: 'uppercase', padding: 0,
+        }}>← Neu generieren</button>
+
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <span style={{
+            fontFamily: "'DM Mono', monospace", fontSize: 11,
+            letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase',
+          }}>
+            {questions.length} Fragen · {opts?.topic || 'Quiz'}
+          </span>
+        </div>
+
+        <button
+          onClick={() => onDone(questions)}
+          disabled={questions.length === 0}
+          style={{
+            background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+            border: 'none', borderRadius: 10, padding: '8px 20px',
+            color: 'white', fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700, fontSize: 13, cursor: questions.length === 0 ? 'not-allowed' : 'pointer',
+            opacity: questions.length === 0 ? 0.5 : 1,
+          }}
+        >
+          Weiter →
+        </button>
+      </div>
+
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 20px 60px' }}>
+
+        {/* Intro */}
+        <div style={{
+          background: `${C.indigo}10`, border: `1px solid ${C.indigo}30`,
+          borderRadius: 14, padding: '14px 18px', marginBottom: 24,
+          display: 'flex', gap: 12, alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>✦</span>
+          <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
+            Prüfe und bearbeite die generierten Fragen. Klicke auf eine Frage zum Bearbeiten oder lösche sie. Wenn du fertig bist, klicke auf <strong style={{ color: C.chalk }}>Weiter →</strong>
+          </p>
+        </div>
+
+        {/* Question list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {questions.map((q, idx) => (
+            <div
+              key={q._id}
+              className="eq-card"
+              style={{
+                background: C.mid, border: `1px solid ${C.border}`,
+                borderRadius: 16, overflow: 'hidden', position: 'relative',
+              }}
+            >
+              {/* Question header */}
+              <div style={{ padding: '16px 20px 12px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                {/* Number badge */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: `${C.indigo}20`, border: `1px solid ${C.indigo}33`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  fontWeight: 700, color: C.indigo, marginTop: 1,
+                }}>
+                  {idx + 1}
+                </div>
+                <p style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.5, color: C.chalk, flex: 1 }}>
+                  {q.question}
+                </p>
+
+                {/* Action buttons — appear on hover */}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    className="eq-edit-btn"
+                    onClick={() => openEdit(idx)}
+                    style={{
+                      background: `${C.indigo}18`, border: `1px solid ${C.indigo}44`,
+                      borderRadius: 8, padding: '5px 12px',
+                      color: C.indigo, fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                    }}
+                  >✎ Bearbeiten</button>
+                  <button
+                    className="eq-del-btn"
+                    onClick={() => setDeleteConfirm(idx)}
+                    style={{
+                      background: `${C.red}15`, border: `1px solid ${C.red}44`,
+                      borderRadius: 8, padding: '5px 10px',
+                      color: C.red, fontFamily: "'Space Grotesk', sans-serif",
+                      fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                    }}
+                  >✕</button>
+                </div>
+              </div>
+
+              {/* Answer options — 2x2 grid */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr',
+                gap: 6, padding: '0 20px 16px',
+              }}>
+                {q.options.map((opt, oi) => (
+                  <div key={oi} style={{
+                    background: oi === q.correct ? `${C.green}15` : `${C.light}`,
+                    border: `1px solid ${oi === q.correct ? C.green : C.border}44`,
+                    borderRadius: 10, padding: '8px 12px',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      background: oi === q.correct ? `${C.green}25` : `${C.indigo}15`,
+                      border: `1px solid ${oi === q.correct ? C.green : C.indigo}44`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 700,
+                      color: oi === q.correct ? C.green : C.indigo,
+                    }}>{LABELS[oi]}</span>
+                    <span style={{
+                      fontSize: 13, color: oi === q.correct ? C.green : C.muted,
+                      fontWeight: oi === q.correct ? 600 : 400,
+                      lineHeight: 1.4,
+                    }}>{opt}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Explanation */}
+              {q.explanation && (
+                <div style={{
+                  borderTop: `1px solid ${C.border}`,
+                  padding: '10px 20px',
+                  display: 'flex', gap: 8, alignItems: 'flex-start',
+                }}>
+                  <span style={{
+                    fontFamily: "'DM Mono', monospace", fontSize: 10,
+                    color: C.indigo, textTransform: 'uppercase',
+                    letterSpacing: '0.08em', flexShrink: 0, marginTop: 1,
+                  }}>Erkl.</span>
+                  <p style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                    {q.explanation}
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {questions.length === 0 && (
+          <div style={{
+            textAlign: 'center', padding: '48px 24px',
+            background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16,
+          }}>
+            <p style={{ color: C.muted, fontSize: 15, marginBottom: 16 }}>Alle Fragen gelöscht.</p>
+            <button onClick={() => onNavigate('generate')} style={{
+              background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+              border: 'none', borderRadius: 12, padding: '12px 24px',
+              color: 'white', fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700, fontSize: 14, cursor: 'pointer',
+            }}>← Neu generieren</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Edit Modal ── */}
+      <Modal open={editIdx !== null} onClose={() => setEditIdx(null)} title={`Frage ${editIdx !== null ? editIdx + 1 : ''} bearbeiten`}>
+        {editIdx !== null && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '70vh', overflowY: 'auto' }}>
+
+            {/* Question text */}
+            <div>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
+                Frage
+              </label>
+              <textarea
+                value={editQ}
+                onChange={e => setEditQ(e.target.value)}
+                style={{
+                  width: '100%', background: C.light, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: '10px 12px', color: C.chalk,
+                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
+                  outline: 'none', resize: 'vertical', minHeight: 72, lineHeight: 1.6,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* Answer options */}
+            <div>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>
+                Antworten — klicke auf ✓ um die richtige Antwort zu markieren
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {editOpts.map((opt, oi) => (
+                  <div key={oi} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button
+                      className="eq-opt-btn"
+                      onClick={() => setEditCorrect(oi)}
+                      style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        background: editCorrect === oi ? `${C.green}25` : `${C.indigo}15`,
+                        border: `1.5px solid ${editCorrect === oi ? C.green : `${C.indigo}44`}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 700,
+                        color: editCorrect === oi ? C.green : C.indigo,
+                      }}
+                    >{editCorrect === oi ? '✓' : LABELS[oi]}</button>
+                    <input
+                      value={opt}
+                      onChange={e => {
+                        const next = [...editOpts];
+                        next[oi] = e.target.value;
+                        setEditOpts(next);
+                      }}
+                      style={{
+                        flex: 1, background: C.light, border: `1px solid ${editCorrect === oi ? C.green : C.border}`,
+                        borderRadius: 8, padding: '8px 12px', color: C.chalk,
+                        fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, outline: 'none',
+                      }}
+                      placeholder={`Antwort ${LABELS[oi]}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Explanation */}
+            <div>
+              <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>
+                Erklärung
+              </label>
+              <textarea
+                value={editExp}
+                onChange={e => setEditExp(e.target.value)}
+                style={{
+                  width: '100%', background: C.light, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: '10px 12px', color: C.chalk,
+                  fontFamily: "'Space Grotesk', sans-serif", fontSize: 13,
+                  outline: 'none', resize: 'vertical', minHeight: 56, lineHeight: 1.6,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
+              <button
+                onClick={() => setEditIdx(null)}
+                style={{
+                  flex: 1, background: 'transparent', border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: '11px', color: C.muted,
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                }}
+              >Abbrechen</button>
+              <button
+                onClick={saveEdit}
+                disabled={!editQ.trim()}
+                style={{
+                  flex: 1, background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+                  border: 'none', borderRadius: 10, padding: '11px',
+                  color: 'white', fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                  opacity: !editQ.trim() ? 0.5 : 1,
+                }}
+              >Speichern</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)} title="Frage löschen?">
+        <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
+          Frage {deleteConfirm !== null ? deleteConfirm + 1 : ''} wird unwiderruflich gelöscht.
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setDeleteConfirm(null)} style={{
+            flex: 1, background: 'transparent', border: `1px solid ${C.border}`,
+            borderRadius: 10, padding: '11px', color: C.muted,
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer',
+          }}>Abbrechen</button>
+          <button onClick={() => deleteQuestion(deleteConfirm)} style={{
+            flex: 1, background: C.red, border: 'none',
+            borderRadius: 10, padding: '11px', color: 'white',
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14, cursor: 'pointer',
+          }}>Löschen</button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 // ─── SCREEN: Quiz Ready (choose mode) ────────────────────────────────────────
 function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate, onStartQuiz, user, showToast }) {
   const stored = JSON.parse(sessionStorage.getItem('quizData') || '{}');
@@ -2408,6 +2761,14 @@ export default function App() {
     const data = { questions: questions || [], opts };
     sessionStorage.setItem('quizData', JSON.stringify(data));
     quizRef.current = { questions: questions || [], mode: null, opts };
+    setScreen('editor'); // Go to editor first
+  };
+
+  const onEditorDone = (editedQuestions) => {
+    const opts = quizRef.current.opts;
+    const data = { questions: editedQuestions, opts };
+    sessionStorage.setItem('quizData', JSON.stringify(data));
+    quizRef.current = { questions: editedQuestions, mode: null, opts };
     setScreen('ready');
   };
 
@@ -2420,6 +2781,15 @@ export default function App() {
         return <JoinScreen onNavigate={navigate} onStartQuiz={startQuiz} />;
       case 'generate':
         return <GenerateScreen onNavigate={navigate} onQuizReady={onQuizReady} user={user} />;
+      case 'editor':
+        return (
+          <QuizEditorScreen
+            questions={quizRef.current.questions}
+            opts={quizRef.current.opts}
+            onNavigate={navigate}
+            onDone={onEditorDone}
+          />
+        );
       case 'ready':
         return (
           <QuizReadyScreen
@@ -2463,7 +2833,7 @@ export default function App() {
     <>
       {renderScreen()}
       {/* Persistent account button — shown on all screens when logged in, except on account screen itself */}
-      {screen !== 'account' && (
+      {screen !== 'account' && screen !== 'play' && (
         <UserBar user={user} onNavigate={navigate} />
       )}
       {toast && (
