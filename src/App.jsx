@@ -2715,9 +2715,25 @@ export default function App() {
   const quizRef = useRef({ questions: [], mode: null, opts: null });
 
   useEffect(() => {
-    // Check for PIN in URL
+    // Check for PIN in URL — auto-load quiz directly, skip join screen
     const params = new URLSearchParams(window.location.search);
-    if (params.get('pin')) setScreen('join');
+    const urlPin = params.get('pin');
+    if (urlPin && /^\d{6}$/.test(urlPin)) {
+      // Fetch quiz directly and start playing
+      fetch(`/.netlify/functions/get-quiz-session?pin=${urlPin}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.questions && data.questions.length > 0) {
+            const playData = { questions: data.questions, mode: 'solo', opts: data.opts };
+            sessionStorage.setItem('quizPlay', JSON.stringify(playData));
+            quizRef.current = playData;
+            setScreen('play');
+          } else {
+            setScreen('join'); // Fallback to join screen if no questions
+          }
+        })
+        .catch(() => setScreen('join')); // Fallback on error
+    }
 
     // Auth listener
     if (supabase) {
