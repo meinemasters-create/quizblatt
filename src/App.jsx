@@ -1494,12 +1494,24 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
                   })
                   .then(r => r.json())
                   .then(data => {
+                    if (!data.pin) throw new Error('Kein PIN erhalten');
                     setPin(data.pin);
                     const appUrl = `${window.location.origin}?pin=${data.pin}`;
                     setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(appUrl)}`);
                     setShowSoloShare(true);
                   })
-                  .catch(e => showToast('PIN konnte nicht erstellt werden. Supabase konfiguriert?', 'error'))
+                  .catch(() => {
+                    // Fallback: encode quiz directly in URL (no Supabase needed)
+                    try {
+                      const encoded = btoa(encodeURIComponent(JSON.stringify({ questions, opts })));
+                      const appUrl = `${window.location.origin}?quiz=${encoded}`;
+                      setPin('——');
+                      setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(appUrl)}`);
+                      setShowSoloShare(true);
+                    } catch(e2) {
+                      showToast('QR-Code konnte nicht erstellt werden', 'error');
+                    }
+                  })
                   .finally(() => setSharing(false));
                 } else {
                   onStartQuiz(questions, m.id, opts);
@@ -2724,19 +2736,32 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Check for PIN in URL — load quiz directly, bypass join screen
+    // Check for URL parameters — load quiz directly, bypass join screen
     const params = new URLSearchParams(window.location.search);
     const urlPin = params.get('pin');
-    if (urlPin && /^\d{6}$/.test(urlPin)) {
+    const urlQuiz = params.get('quiz');
+
+    if (urlQuiz) {
+      // Fallback: quiz encoded directly in URL
+      try {
+        const decoded = JSON.parse(decodeURIComponent(atob(urlQuiz)));
+        if (decoded.questions && decoded.questions.length > 0) {
+          const pd = { questions: decoded.questions, mode: 'solo', opts: decoded.opts };
+          sessionStorage.setItem('quizPlay', JSON.stringify(pd));
+          quizRef.current = pd;
+          setPlayData(pd);
+          setScreen('play');
+        }
+      } catch(e) { /* invalid encoded data, stay on home */ }
+    } else if (urlPin && /^\d{6}$/.test(urlPin)) {
       fetch(`/.netlify/functions/get-quiz-session?pin=${urlPin}`)
         .then(r => r.json())
         .then(data => {
           if (data.questions && data.questions.length > 0) {
-            // Write directly — don't call goPlay (closure issue)
             const pd = { questions: data.questions, mode: 'solo', opts: data.opts };
             sessionStorage.setItem('quizPlay', JSON.stringify(pd));
             quizRef.current = pd;
-            setPlayData(pd);      // triggers re-render with data
+            setPlayData(pd);
             setScreen('play');
           } else {
             setScreen('join');
