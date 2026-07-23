@@ -254,6 +254,7 @@ function Modal({ open, onClose, title, children }) {
       }}
     >
       <div
+        className="modal-inner"
         onClick={e => e.stopPropagation()}
         style={{ ...css.card, maxWidth: 440, width: '100%', boxShadow: '0 24px 48px #000a' }}
       >
@@ -325,7 +326,7 @@ function UserBar({ user, onNavigate }) {
         }}>
           {user.email[0].toUpperCase()}
         </div>
-        Mein Konto
+        <span className="userbar-label">Mein Konto</span>
       </button>
     </div>
   );
@@ -860,7 +861,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
           </div>
 
           {/* Dropdowns row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div className="gen-settings-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={labelStyle}>Schwierigkeit</label>
               <div style={{ position: 'relative' }}>
@@ -1578,7 +1579,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
                 display: 'flex', alignItems: 'center', gap: 20,
               }}
             >
-              <div style={{
+              <div className="mode-icon" style={{
                 width: 48, height: 48, borderRadius: 14, flexShrink: 0,
                 background: `${C.indigo}18`, border: `1px solid ${C.indigo}33`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1629,7 +1630,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
               background: 'white', borderRadius: 20, padding: 16,
               marginBottom: 28, boxShadow: `0 0 0 1px ${C.border}`,
             }}>
-              <img src={qrUrl} alt="QR-Code" style={{ width: 200, height: 200, display: 'block' }} />
+              <img src={qrUrl} alt="QR-Code" className="solo-qr" style={{ width: 200, height: 200, display: 'block' }} />
             </div>
           )}
 
@@ -1644,7 +1645,7 @@ function QuizReadyScreen({ questions: questionsProp, opts: optsProp, onNavigate,
               letterSpacing: '0.14em', color: C.muted,
               textTransform: 'uppercase', marginBottom: 8,
             }}>PIN</div>
-            <div style={{
+            <div className="solo-pin" style={{
               fontFamily: "'DM Mono', monospace",
               fontSize: 52, fontWeight: 700,
               color: C.indigo, letterSpacing: 10, lineHeight: 1,
@@ -2936,6 +2937,67 @@ export default function App() {
 
   return (
     <>
+      <style>{`
+        /* ── Global mobile styles ── */
+        * { -webkit-tap-highlight-color: transparent; }
+
+        /* Prevent horizontal scroll */
+        html, body { overflow-x: hidden; max-width: 100vw; }
+
+        /* Touch-friendly tap targets */
+        button { min-height: 36px; }
+
+        /* Modals full-screen on small phones */
+        @media (max-width: 480px) {
+          .modal-inner {
+            max-width: 100% !important;
+            margin: 0 !important;
+            border-radius: 20px 20px 0 0 !important;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+          }
+        }
+
+        /* Home tiles: 2 col on tablet, 1 col on small phone */
+        @media (max-width: 480px) {
+          .home-tiles { grid-template-columns: 1fr !important; }
+        }
+
+        /* Answer grid: 1 col on small phone */
+        @media (max-width: 480px) {
+          .opt-grid { grid-template-columns: 1fr !important; }
+          .answer-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* Editor accordion: smaller padding on phone */
+        @media (max-width: 480px) {
+          .eq-edit-btn span { display: none; }
+        }
+
+        /* Settings grid: stack on small phone */
+        @media (max-width: 480px) {
+          .gen-settings-grid { grid-template-columns: 1fr !important; }
+        }
+
+        /* Solo share QR: smaller on phone */
+        @media (max-width: 480px) {
+          .solo-qr { width: 160px !important; height: 160px !important; }
+          .solo-pin { font-size: 38px !important; letter-spacing: 6px !important; }
+        }
+
+        /* UserBar: smaller on phone */
+        @media (max-width: 400px) {
+          .userbar-label { display: none; }
+        }
+
+        /* Mode cards: tighter padding on phone */
+        @media (max-width: 480px) {
+          .mode-card { padding: 16px !important; gap: 14px !important; }
+          .mode-icon { width: 38px !important; height: 38px !important; }
+        }
+      `}</style>
       {renderScreen()}
       {/* Persistent account button — shown on all screens when logged in, except on account screen itself */}
       {screen !== 'account' && screen !== 'play' && (
