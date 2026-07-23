@@ -969,8 +969,9 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
 // ─── SCREEN: Quiz Editor ──────────────────────────────────────────────────────
 function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDone }) {
   const [questions, setQuestions] = useState(initialQuestions.map((q, i) => ({ ...q, _id: i })));
-  const [editIdx, setEditIdx] = useState(null); // which question is being edited
+  const [editIdx, setEditIdx] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [expandedIdx, setExpandedIdx] = useState(null); // null = all collapsed
 
   // ── Edit state for the currently open question ────────────────────────────
   const [editQ, setEditQ] = useState('');
@@ -1075,105 +1076,157 @@ function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDon
         </div>
 
         {/* Question list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {questions.map((q, idx) => (
-            <div
-              key={q._id}
-              className="eq-card"
-              style={{
-                background: C.mid, border: `1px solid ${C.border}`,
-                borderRadius: 16, overflow: 'hidden', position: 'relative',
-              }}
-            >
-              {/* Question header */}
-              <div style={{ padding: '16px 20px 12px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                {/* Number badge */}
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                  background: `${C.indigo}20`, border: `1px solid ${C.indigo}33`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: "'DM Mono', monospace", fontSize: 12,
-                  fontWeight: 700, color: C.indigo, marginTop: 1,
-                }}>
-                  {idx + 1}
-                </div>
-                <p style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.5, color: C.chalk, flex: 1 }}>
-                  {q.question}
-                </p>
+        {/* Expand/Collapse all controls */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 4 }}>
+          <button
+            onClick={() => setExpandedIdx('all')}
+            style={{
+              background: 'transparent', border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: '6px 14px',
+              color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 600, fontSize: 12, cursor: 'pointer',
+            }}
+          >▾ Alle aufklappen</button>
+          <button
+            onClick={() => setExpandedIdx(null)}
+            style={{
+              background: 'transparent', border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: '6px 14px',
+              color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 600, fontSize: 12, cursor: 'pointer',
+            }}
+          >▸ Alle einklappen</button>
+        </div>
 
-                {/* Action buttons — appear on hover */}
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                  <button
-                    className="eq-edit-btn"
-                    onClick={() => openEdit(idx)}
-                    style={{
-                      background: `${C.indigo}18`, border: `1px solid ${C.indigo}44`,
-                      borderRadius: 8, padding: '5px 12px',
-                      color: C.indigo, fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 600, fontSize: 12, cursor: 'pointer',
-                    }}
-                  >✎ Bearbeiten</button>
-                  <button
-                    className="eq-del-btn"
-                    onClick={() => setDeleteConfirm(idx)}
-                    style={{
-                      background: `${C.red}15`, border: `1px solid ${C.red}44`,
-                      borderRadius: 8, padding: '5px 10px',
-                      color: C.red, fontFamily: "'Space Grotesk', sans-serif",
-                      fontWeight: 600, fontSize: 12, cursor: 'pointer',
-                    }}
-                  >✕</button>
-                </div>
-              </div>
-
-              {/* Answer options — 2x2 grid */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr',
-                gap: 6, padding: '0 20px 16px',
-              }}>
-                {q.options.map((opt, oi) => (
-                  <div key={oi} style={{
-                    background: oi === q.correct ? `${C.green}15` : `${C.light}`,
-                    border: `1px solid ${oi === q.correct ? C.green : C.border}44`,
-                    borderRadius: 10, padding: '8px 12px',
-                    display: 'flex', alignItems: 'center', gap: 8,
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {questions.map((q, idx) => {
+            const isOpen = expandedIdx === 'all' || expandedIdx === idx;
+            return (
+              <div
+                key={q._id}
+                className="eq-card"
+                style={{
+                  background: C.mid, border: `1px solid ${isOpen ? C.indigo + '55' : C.border}`,
+                  borderRadius: 14, overflow: 'hidden', position: 'relative',
+                  transition: 'border-color 0.15s ease',
+                }}
+              >
+                {/* ── Collapsed header — always visible ── */}
+                <div
+                  onClick={() => setExpandedIdx(isOpen && expandedIdx !== 'all' ? null : idx)}
+                  style={{
+                    padding: '14px 18px', display: 'flex', gap: 12,
+                    alignItems: 'center', cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                >
+                  {/* Number badge */}
+                  <div style={{
+                    width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                    background: isOpen ? `${C.indigo}25` : `${C.indigo}15`,
+                    border: `1px solid ${C.indigo}${isOpen ? '55' : '33'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: "'DM Mono', monospace", fontSize: 11,
+                    fontWeight: 700, color: C.indigo,
+                    transition: 'all 0.15s',
                   }}>
-                    <span style={{
-                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                      background: oi === q.correct ? `${C.green}25` : `${C.indigo}15`,
-                      border: `1px solid ${oi === q.correct ? C.green : C.indigo}44`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 700,
-                      color: oi === q.correct ? C.green : C.indigo,
-                    }}>{LABELS[oi]}</span>
-                    <span style={{
-                      fontSize: 13, color: oi === q.correct ? C.green : C.muted,
-                      fontWeight: oi === q.correct ? 600 : 400,
-                      lineHeight: 1.4,
-                    }}>{opt}</span>
+                    {idx + 1}
                   </div>
-                ))}
-              </div>
 
-              {/* Explanation */}
-              {q.explanation && (
-                <div style={{
-                  borderTop: `1px solid ${C.border}`,
-                  padding: '10px 20px',
-                  display: 'flex', gap: 8, alignItems: 'flex-start',
-                }}>
-                  <span style={{
-                    fontFamily: "'DM Mono', monospace", fontSize: 10,
-                    color: C.indigo, textTransform: 'uppercase',
-                    letterSpacing: '0.08em', flexShrink: 0, marginTop: 1,
-                  }}>Erkl.</span>
-                  <p style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                    {q.explanation}
+                  {/* Question text — always shown */}
+                  <p style={{
+                    fontWeight: 600, fontSize: 14, lineHeight: 1.45,
+                    color: C.chalk, flex: 1,
+                  }}>
+                    {q.question}
                   </p>
+
+                  {/* Right side: action buttons + chevron */}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <button
+                      className="eq-edit-btn"
+                      onClick={e => { e.stopPropagation(); openEdit(idx); }}
+                      style={{
+                        background: `${C.indigo}18`, border: `1px solid ${C.indigo}44`,
+                        borderRadius: 7, padding: '4px 10px',
+                        color: C.indigo, fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                      }}
+                    >✎</button>
+                    <button
+                      className="eq-del-btn"
+                      onClick={e => { e.stopPropagation(); setDeleteConfirm(idx); }}
+                      style={{
+                        background: `${C.red}15`, border: `1px solid ${C.red}44`,
+                        borderRadius: 7, padding: '4px 8px',
+                        color: C.red, fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                      }}
+                    >✕</button>
+                    {/* Chevron */}
+                    <span style={{
+                      color: C.muted, fontSize: 12,
+                      fontFamily: "'DM Mono', monospace",
+                      transform: isOpen ? 'rotate(90deg)' : 'none',
+                      transition: 'transform 0.2s ease',
+                      display: 'inline-block', marginLeft: 2,
+                    }}>▸</span>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* ── Expanded content — answers + explanation ── */}
+                {isOpen && (
+                  <div style={{ borderTop: `1px solid ${C.border}` }}>
+                    {/* Answer grid 2×2 */}
+                    <div style={{
+                      display: 'grid', gridTemplateColumns: '1fr 1fr',
+                      gap: 6, padding: '12px 18px',
+                    }}>
+                      {q.options.map((opt, oi) => (
+                        <div key={oi} style={{
+                          background: oi === q.correct ? `${C.green}15` : C.light,
+                          border: `1px solid ${oi === q.correct ? C.green : C.border}44`,
+                          borderRadius: 10, padding: '8px 12px',
+                          display: 'flex', alignItems: 'center', gap: 8,
+                        }}>
+                          <span style={{
+                            width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                            background: oi === q.correct ? `${C.green}25` : `${C.indigo}15`,
+                            border: `1px solid ${oi === q.correct ? C.green : C.indigo}44`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: "'DM Mono', monospace", fontSize: 10, fontWeight: 700,
+                            color: oi === q.correct ? C.green : C.indigo,
+                          }}>{LABELS[oi]}</span>
+                          <span style={{
+                            fontSize: 13, lineHeight: 1.4,
+                            color: oi === q.correct ? C.green : C.muted,
+                            fontWeight: oi === q.correct ? 600 : 400,
+                          }}>{opt}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Explanation */}
+                    {q.explanation && (
+                      <div style={{
+                        borderTop: `1px solid ${C.border}`,
+                        padding: '10px 18px',
+                        display: 'flex', gap: 8,
+                      }}>
+                        <span style={{
+                          fontFamily: "'DM Mono', monospace", fontSize: 10,
+                          color: C.indigo, textTransform: 'uppercase',
+                          letterSpacing: '0.08em', flexShrink: 0, marginTop: 1,
+                        }}>Erkl.</span>
+                        <p style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                          {q.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {questions.length === 0 && (
