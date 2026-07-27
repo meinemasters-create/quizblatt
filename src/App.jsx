@@ -676,9 +676,11 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
         let rem = count;
         while (rem > 0) { batches.push(Math.min(BATCH, rem)); rem -= BATCH; }
         for (let i = 0; i < batches.length; i++) {
+          // Send already-generated questions so KI avoids duplicates
+          const existingQuestions = allQuestions.map(q => q.question);
           const res = await fetch('/.netlify/functions/generate-quiz', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, count: batches[i] }),
+            body: JSON.stringify({ ...body, count: batches[i], existingQuestions }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Generierung fehlgeschlagen');
