@@ -17,7 +17,7 @@ exports.handler = async function(event, context) {
   try { body = JSON.parse(event.body); }
   catch (e) { return { statusCode: 400, headers, body: JSON.stringify({ error: 'Ungültiger Request-Body' }) }; }
 
-  const { source, content, imageData, imageType, count = 10, difficulty = 'gemischt', level = 'Gymnasium', withImages = false } = body;
+  const { source, content, imageData, imageType, count = 10, difficulty = 'gemischt', level = 'Gymnasium', withImages = false, existingQuestions = [] } = body;
 
   const messageContent = [];
   if (source === 'image' && imageData && imageType) {
@@ -27,16 +27,22 @@ exports.handler = async function(event, context) {
     messageContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: imageData } });
     messageContent.push({ type: 'text', text: `Erstelle exakt ${count} EINZIGARTIGE Multiple-Choice-Fragen aus dem PDF, jede zu einem anderen Aspekt. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? ' Füge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild.' : ''}` });
   } else {
-    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} EINZIGARTIGE Multiple-Choice-Fragen zum Thema: ${content}\n\nJede Frage muss einen anderen Aspekt, Fakt oder Teilbereich abfragen. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? '\n\nFüge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild (z.B. "weimar republic germany 1919" oder "pythagorean theorem triangle").' : ''}` });
+    const existingList = existingQuestions.length > 0
+      ? `\n\nBereits generierte Fragen (DIESE NICHT WIEDERHOLEN, auch nicht sinngemäß):\n${existingQuestions.map((q, i) => `${i+1}. ${q}`).join('\n')}`
+      : '';
+    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} NEUE, EINZIGARTIGE Multiple-Choice-Fragen zum Thema: ${content}${existingList}\n\nJede Frage muss einen völlig anderen Aspekt, Fakt oder Teilbereich abfragen als alle anderen. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? '\n\nFüge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild.' : ''}` });
   }
 
+  const existingHint = existingQuestions.length > 0
+    ? `\n- Es wurden bereits ${existingQuestions.length} Fragen generiert. Deine neuen Fragen dürfen sich inhaltlich NICHT mit diesen überschneiden.`
+    : '';
   const systemPrompt = `Du bist ein erfahrener Pädagoge. Erstelle Multiple-Choice-Fragen. Niveau: ${level}. Schwierigkeit: ${difficulty}.
-WICHTIG:
-- Jede Frage MUSS einen anderen Aspekt, Fakt oder Teilbereich des Themas abfragen
-- KEINE Wiederholungen: nicht dieselbe Kernaussage mit anderen Worten
-- KEINE semantisch ähnlichen Fragen (z.B. nicht zweimal nach demselben Begriff fragen)
-- Decke möglichst viele verschiedene Aspekte des Themas ab
-- Genau 4 Antwortoptionen pro Frage, exakt eine korrekt
+WICHTIGE REGELN:
+- Jede Frage MUSS einen völlig anderen Aspekt, Fakt oder Teilbereich abfragen
+- ABSOLUT KEINE Wiederholungen: weder wörtlich noch sinngemäß
+- KEINE Fragen die dasselbe Wissen auf andere Weise testen
+- Verteile die Fragen über verschiedene Teilbereiche des Themas
+- Genau 4 Antwortoptionen pro Frage, exakt eine korrekt${existingHint}
 - Antworte NUR via quiz_output tool.`;
 
   // Build tool schema — with or without imageQuery field
