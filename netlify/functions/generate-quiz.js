@@ -22,15 +22,22 @@ exports.handler = async function(event, context) {
   const messageContent = [];
   if (source === 'image' && imageData && imageType) {
     messageContent.push({ type: 'image', source: { type: 'base64', media_type: imageType, data: imageData } });
-    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} Multiple-Choice-Fragen aus dem Bild. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? ' Füge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild (z.B. "french revolution 1789" oder "photosynthesis plant cells").' : ''}` });
+    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} EINZIGARTIGE Multiple-Choice-Fragen aus dem Bild, jede zu einem anderen Aspekt. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? ' Füge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild (z.B. "french revolution 1789" oder "photosynthesis plant cells").' : ''}` });
   } else if (source === 'pdf' && imageData) {
     messageContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: imageData } });
-    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} Multiple-Choice-Fragen aus dem PDF. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? ' Füge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild.' : ''}` });
+    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} EINZIGARTIGE Multiple-Choice-Fragen aus dem PDF, jede zu einem anderen Aspekt. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? ' Füge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild.' : ''}` });
   } else {
-    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} Multiple-Choice-Fragen zum Thema: ${content}\n\nSchwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? '\n\nFüge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild (z.B. "weimar republic germany 1919" oder "pythagorean theorem triangle").' : ''}` });
+    messageContent.push({ type: 'text', text: `Erstelle exakt ${count} EINZIGARTIGE Multiple-Choice-Fragen zum Thema: ${content}\n\nJede Frage muss einen anderen Aspekt, Fakt oder Teilbereich abfragen. Schwierigkeit: ${difficulty}. Niveau: ${level}.${withImages ? '\n\nFüge bei jeder Frage ein "imageQuery"-Feld hinzu: ein präziser englischer Suchbegriff für ein passendes Bild (z.B. "weimar republic germany 1919" oder "pythagorean theorem triangle").' : ''}` });
   }
 
-  const systemPrompt = `Pädagoge. Erstelle Multiple-Choice-Fragen. Niveau: ${level}. Schwierigkeit: ${difficulty}. Genau 4 Optionen pro Frage, eine korrekt. Antworte NUR via quiz_output tool.`;
+  const systemPrompt = `Du bist ein erfahrener Pädagoge. Erstelle Multiple-Choice-Fragen. Niveau: ${level}. Schwierigkeit: ${difficulty}.
+WICHTIG:
+- Jede Frage MUSS einen anderen Aspekt, Fakt oder Teilbereich des Themas abfragen
+- KEINE Wiederholungen: nicht dieselbe Kernaussage mit anderen Worten
+- KEINE semantisch ähnlichen Fragen (z.B. nicht zweimal nach demselben Begriff fragen)
+- Decke möglichst viele verschiedene Aspekte des Themas ab
+- Genau 4 Antwortoptionen pro Frage, exakt eine korrekt
+- Antworte NUR via quiz_output tool.`;
 
   // Build tool schema — with or without imageQuery field
   const questionSchema = {
