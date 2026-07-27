@@ -2772,6 +2772,24 @@ function DatenschutzScreen({ onNavigate }) {
   );
 }
 
+// ─── UTIL: Deduplicate questions ──────────────────────────────────────────────
+function deduplicateQuestions(questions) {
+  const seen = new Set();
+  return questions.filter(q => {
+    // Normalize: lowercase, remove punctuation, trim
+    const normalized = q.question
+      .toLowerCase()
+      .replace(/[^a-züäöß0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    // Extract key words (ignore short words)
+    const keyWords = normalized.split(' ').filter(w => w.length > 4).slice(0, 5).join(' ');
+    if (seen.has(keyWords)) return false;
+    seen.add(keyWords);
+    return true;
+  });
+}
+
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState('home');
@@ -2858,7 +2876,8 @@ export default function App() {
   };
 
   const onQuizReady = (questions, opts) => {
-    const data = { questions: questions || [], opts };
+    const unique = deduplicateQuestions(questions || []);
+    const data = { questions: unique, opts };
     sessionStorage.setItem('quizData', JSON.stringify(data));
     quizRef.current = { questions: questions || [], mode: null, opts };
     setScreen('editor'); // Go to editor first
