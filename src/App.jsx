@@ -970,17 +970,40 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
 }
 
 // ─── SCREEN: Quiz Editor ──────────────────────────────────────────────────────
-function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDone }) {
+function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDone, user, showToast }) {
   const [questions, setQuestions] = useState(initialQuestions.map((q, i) => ({ ...q, _id: i })));
   const [editIdx, setEditIdx] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [expandedIdx, setExpandedIdx] = useState(null); // null = all collapsed
+  const [saveModal, setSaveModal] = useState(false);
+  const [saveTitle, setSaveTitle] = useState(opts?.topic || 'Mein Quiz');
+  const [newFolder, setNewFolder] = useState('');
 
   // ── Edit state for the currently open question ────────────────────────────
   const [editQ, setEditQ] = useState('');
   const [editOpts, setEditOpts] = useState(['', '', '', '']);
   const [editCorrect, setEditCorrect] = useState(0);
   const [editExp, setEditExp] = useState('');
+
+  const handleSave = async () => {
+    if (!supabase || !user) return;
+    let folderId = null;
+    if (newFolder.trim()) {
+      const { data } = await supabase.from('quiz_folders')
+        .insert({ name: newFolder.trim(), user_id: user.id }).select().single();
+      if (data) folderId = data.id;
+    }
+    const { error } = await supabase.from('saved_quizzes').insert({
+      user_id: user.id, folder_id: folderId,
+      title: saveTitle, questions, opts,
+    });
+    if (error) {
+      showToast('Fehler beim Speichern: ' + (error.message || ''), 'error');
+    } else {
+      showToast('Quiz gespeichert!', 'success');
+      setSaveModal(false);
+    }
+  };
 
   const openEdit = (idx) => {
     const q = questions[idx];
@@ -1030,34 +1053,53 @@ function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDon
       {/* Header */}
       <div style={{
         background: C.mid, borderBottom: `1px solid ${C.border}`,
-        padding: '0 20px', height: 56,
-        display: 'flex', alignItems: 'center', gap: 16,
-        position: 'sticky', top: 0, zIndex: 100,
+        padding: '0 16px', height: 56,
+        display: 'flex', alignItems: 'center', gap: 10,
+        position: 'sticky', top: 0, zIndex: 300,  // above UserBar (200)
       }}>
         <button onClick={() => onNavigate('generate')} style={{
           background: 'none', border: 'none', cursor: 'pointer',
-          color: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace",
-          letterSpacing: '0.08em', textTransform: 'uppercase', padding: 0,
-        }}>← Neu generieren</button>
+          color: C.muted, fontSize: 11, fontFamily: "'DM Mono', monospace",
+          letterSpacing: '0.06em', textTransform: 'uppercase', padding: 0,
+          whiteSpace: 'nowrap', flexShrink: 0,
+        }}>← Zurück</button>
 
-        <div style={{ flex: 1, textAlign: 'center' }}>
+        <div style={{ flex: 1, textAlign: 'center', overflow: 'hidden' }}>
           <span style={{
             fontFamily: "'DM Mono', monospace", fontSize: 11,
-            letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase',
+            letterSpacing: '0.1em', color: C.muted, textTransform: 'uppercase',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: 'block',
           }}>
-            {questions.length} Fragen · {opts?.topic || 'Quiz'}
+            {questions.length} Fragen
           </span>
         </div>
+
+        {/* Save button — only when user is logged in */}
+        {user && (
+          <button
+            onClick={() => setSaveModal(true)}
+            style={{
+              background: 'transparent', border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: '6px 12px',
+              color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 600, fontSize: 12, cursor: 'pointer',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+          >⬡ Speichern</button>
+        )}
 
         <button
           onClick={() => onDone(questions)}
           disabled={questions.length === 0}
           style={{
-            background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
-            border: 'none', borderRadius: 10, padding: '8px 20px',
-            color: 'white', fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700, fontSize: 13, cursor: questions.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: questions.length === 0 ? 0.5 : 1,
+            background: questions.length === 0 ? C.light : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
+            border: 'none', borderRadius: 10, padding: '8px 16px',
+            color: questions.length === 0 ? C.muted : 'white',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700, fontSize: 13,
+            cursor: questions.length === 0 ? 'not-allowed' : 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0,
           }}
         >
           Weiter →
@@ -1247,6 +1289,33 @@ function QuizEditorScreen({ questions: initialQuestions, opts, onNavigate, onDon
           </div>
         )}
       </div>
+
+      {/* ── Save Modal ── */}
+      <Modal open={saveModal} onClose={() => setSaveModal(false)} title="Quiz speichern">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Titel</label>
+            <input
+              value={saveTitle}
+              onChange={e => setSaveTitle(e.target.value)}
+              style={{ ...css.input }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 6 }}>Neuer Ordner (optional)</label>
+            <input
+              value={newFolder}
+              onChange={e => setNewFolder(e.target.value)}
+              placeholder="z. B. Klasse 8a – Geschichte"
+              style={{ ...css.input }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setSaveModal(false)} style={{ ...css.btn('ghost'), flex: 1 }}>Abbrechen</button>
+            <button onClick={handleSave} style={{ ...css.btn(), flex: 1 }}>Speichern</button>
+          </div>
+        </div>
+      </Modal>
 
       {/* ── Edit Modal ── */}
       <Modal open={editIdx !== null} onClose={() => setEditIdx(null)} title={`Frage ${editIdx !== null ? editIdx + 1 : ''} bearbeiten`}>
@@ -2909,6 +2978,8 @@ export default function App() {
             opts={quizRef.current.opts}
             onNavigate={navigate}
             onDone={onEditorDone}
+            user={user}
+            showToast={showToast}
           />
         );
       case 'ready':
