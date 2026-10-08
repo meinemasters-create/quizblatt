@@ -622,6 +622,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
   const [difficulty, setDifficulty] = useState('gemischt');
   const [level, setLevel] = useState('Sekundarstufe 1');
   const [withImages, setWithImages] = useState(false);
+  const [timerMin, setTimerMin] = useState(0);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
@@ -689,7 +690,7 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
         }
       }
       stopProgress();
-      onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert', withImages });
+      onQuizReady(allQuestions, { count: allQuestions.length, difficulty, level, topic: topic || file?.name || 'Generiert', withImages, timerMin });
     } catch (e) { stopProgress(); setError(e.message); }
     finally { setLoading(false); }
   };
@@ -928,6 +929,27 @@ function GenerateScreen({ onNavigate, onQuizReady, user }) {
               }} />
             </div>
           </button>
+
+          {/* Timer slider */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>⏱</span>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Quiz-Timer</label>
+              </div>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, fontWeight: 700, color: timerMin > 0 ? C.teal : C.muted }}>
+                {timerMin === 0 ? 'Kein Limit' : `${timerMin} Min`}
+              </span>
+            </div>
+            <input type="range" min={0} max={20} step={1} value={timerMin}
+              onChange={e => setTimerMin(Number(e.target.value))}
+              style={{ width: '100%', accentColor: C.teal, cursor: 'pointer', margin: 0, height: 4 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>Kein Limit</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: `${C.muted}66` }}>20 Min</span>
+            </div>
+          </div>
         </div>
 
         {/* Progress */}
@@ -1844,6 +1866,34 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
   const [done, setDone] = useState(false);
   const [exitModal, setExitModal] = useState(false);
 
+  // Timer
+  const timerMin = opts?.timerMin || 0;
+  const [secsLeft, setSecsLeft] = useState(timerMin > 0 ? timerMin * 60 : null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (secsLeft === null) return; // no timer
+    if (done) { clearInterval(timerRef.current); return; }
+    timerRef.current = setInterval(() => {
+      setSecsLeft(s => {
+        if (s <= 1) {
+          clearInterval(timerRef.current);
+          setDone(true);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
+
+  const fmtTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
   // Guard — no questions
   if (!questions || questions.length === 0) {
     return (
@@ -1892,7 +1942,9 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
 
   // ── Results ────────────────────────────────────────────────────────────────
   if (done) {
-    const pct = Math.round((score / total) * 100);
+    const answeredCount = results.length;
+    const pct = answeredCount > 0 ? Math.round((score / total) * 100) : 0;
+    const timerExpired = secsLeft === 0;
     const grade = pct >= 90 ? 'Ausgezeichnet' : pct >= 70 ? 'Gut gemacht' : pct >= 50 ? 'Weiter üben' : 'Nicht aufgeben';
     const scoreColor = pct >= 70 ? C.green : pct >= 50 ? C.amber : C.red;
     return (
@@ -1904,6 +1956,17 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
           padding: '52px 24px 40px',
           textAlign: 'center',
         }}>
+          {timerExpired && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: `${C.red}18`, border: `1px solid ${C.red}44`,
+              borderRadius: 100, padding: '6px 16px', marginBottom: 16,
+              fontFamily: "'DM Mono', monospace", fontSize: 12,
+              letterSpacing: '0.1em', color: C.red, textTransform: 'uppercase',
+            }}>
+              ⏱ Zeit abgelaufen!
+            </div>
+          )}
           <div style={{
             fontFamily: "'DM Mono', monospace", fontSize: 11,
             letterSpacing: '0.14em', color: C.muted,
@@ -1932,7 +1995,7 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
             {grade}
           </h2>
           <p style={{ color: C.muted, fontSize: 15, marginBottom: 24 }}>
-            {score} von {total} Fragen richtig
+            {score} von {answeredCount} {answeredCount < total ? `beantwortet (${total} gesamt)` : 'Fragen richtig'}
           </p>
           {/* Score bar */}
           <div style={{ maxWidth: 360, margin: '0 auto 32px' }}>
@@ -1958,9 +2021,11 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
             </button>
             <button
               onClick={() => {
+                clearInterval(timerRef.current);
                 setCurrent(0); setSelected(null); setScore(0);
                 setResults([]); setDone(false);
                 shuffled.current = questions.map(shuffleAnswers);
+                if (timerMin > 0) setSecsLeft(timerMin * 60);
               }}
               style={{
                 background: `linear-gradient(135deg, ${C.indigo}, ${C.purple})`,
@@ -2027,6 +2092,10 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
           background: rgba(91,110,245,0.13) !important;
           box-shadow: 0 8px 28px rgba(91,110,245,0.28) !important;
         }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.04); }
+        }
       `}</style>
 
       {/* Top bar */}
@@ -2072,6 +2141,20 @@ function QuizPlayScreen({ questions: questionsProp, mode: modeProp, opts: optsPr
         }}>
           {score} ★
         </div>
+
+        {secsLeft !== null && (
+          <div style={{
+            background: secsLeft <= 30 ? `${C.red}18` : `${C.teal}18`,
+            border: `1px solid ${secsLeft <= 30 ? C.red : C.teal}44`,
+            borderRadius: 100, padding: '4px 12px',
+            fontFamily: "'DM Mono', monospace",
+            fontSize: 13, color: secsLeft <= 30 ? C.red : C.teal,
+            fontWeight: 700, flexShrink: 0,
+            animation: secsLeft <= 10 ? 'pulse 0.8s ease-in-out infinite' : 'none',
+          }}>
+            ⏱ {fmtTime(secsLeft)}
+          </div>
+        )}
       </div>
 
       {/* Content */}
