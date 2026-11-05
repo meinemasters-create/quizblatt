@@ -2344,10 +2344,21 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [quizzes, setQuizzes] = useState([]);
   const [folders, setFolders] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [deleting, setDeleting] = useState(null);
+
+  // Check for password-recovery token in URL hash
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setMode('reset');
+      // Clean the hash from the URL without reloading
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => { if (user && supabase) loadMyQuizzes(); }, [user]);
 
@@ -2383,6 +2394,35 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
     setUser(null);
   };
 
+  const handleForgotPassword = async () => {
+    if (!supabase) { setError('Supabase ist nicht konfiguriert.'); return; }
+    if (!email.trim()) { setError('Bitte gib deine E-Mail-Adresse ein.'); return; }
+    setLoading(true); setError(''); setSuccessMsg('');
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin + '/account',
+      });
+      if (err) throw err;
+      setSuccessMsg('E-Mail gesendet! Prüfe dein Postfach und klicke auf den Link.');
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const handleResetPassword = async () => {
+    if (!supabase) { setError('Supabase ist nicht konfiguriert.'); return; }
+    if (password.length < 6) { setError('Das Passwort muss mindestens 6 Zeichen lang sein.'); return; }
+    if (password !== confirm) { setError('Die Passwörter stimmen nicht überein.'); return; }
+    setLoading(true); setError('');
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password });
+      if (err) throw err;
+      showToast('Passwort erfolgreich geändert!', 'success');
+      setMode('login');
+      setPassword(''); setConfirm('');
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
   const handleDelete = async (id) => {
     if (!supabase) return;
     setDeleting(id);
@@ -2394,6 +2434,100 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
     }
     setDeleting(null);
   };
+
+  // ── Passwort vergessen ──────────────────────────────────────────────────────
+  if (!user && mode === 'forgot') {
+    return (
+      <div style={{ ...css.app, minHeight: '100vh' }}>
+        <style>{`.auth-input:focus { border-color: ${C.indigo} !important; }`}</style>
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 24px 60px' }}>
+          <button onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: 13,
+              fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6, padding: 0, marginBottom: 40 }}>
+            ← Zurück zur Anmeldung
+          </button>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase', marginBottom: 10 }}>
+            Passwort zurücksetzen
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>Passwort vergessen?</h1>
+          <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>
+            Gib deine E-Mail-Adresse ein. Du erhältst einen Link zum Zurücksetzen deines Passworts.
+          </p>
+          <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+            <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>E-Mail</label>
+            <input className="auth-input" type="email"
+              style={{ ...css.input, marginBottom: 16, transition: 'border-color 0.15s' }}
+              placeholder="name@schule.de"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(''); setSuccessMsg(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
+            />
+            {error && (
+              <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}44`, borderRadius: 10, padding: '10px 14px', color: C.red, fontSize: 13, marginBottom: 16 }}>{error}</div>
+            )}
+            {successMsg && (
+              <div style={{ background: `${C.green}12`, border: `1px solid ${C.green}44`, borderRadius: 10, padding: '12px 16px', color: C.green, fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>
+                ✓ {successMsg}
+              </div>
+            )}
+            {!successMsg && (
+              <button onClick={handleForgotPassword} disabled={loading}
+                style={{ width: '100%', padding: '14px', background: loading ? C.light : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`, border: 'none', borderRadius: 12, color: loading ? C.muted : 'white', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer' }}>
+                {loading ? 'Sende E-Mail…' : 'Reset-Link senden'}
+              </button>
+            )}
+            {successMsg && (
+              <button onClick={() => { setMode('login'); setSuccessMsg(''); }}
+                style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 12, color: C.muted, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                Zurück zur Anmeldung
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Neues Passwort setzen (nach Klick auf Reset-Link) ───────────────────────
+  if (mode === 'reset') {
+    return (
+      <div style={{ ...css.app, minHeight: '100vh' }}>
+        <style>{`.auth-input:focus { border-color: ${C.indigo} !important; }`}</style>
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '40px 24px 60px' }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.16em', color: C.indigo, textTransform: 'uppercase', marginBottom: 10 }}>
+            Neues Passwort
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>Passwort ändern</h1>
+          <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>Gib dein neues Passwort ein.</p>
+          <div style={{ background: C.mid, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+            <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>Neues Passwort</label>
+            <input className="auth-input" type="password"
+              style={{ ...css.input, marginBottom: 16, transition: 'border-color 0.15s' }}
+              placeholder="Mindestens 6 Zeichen"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(''); }}
+            />
+            <label style={{ display: 'block', fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: '0.12em', color: C.muted, textTransform: 'uppercase', marginBottom: 8 }}>Passwort bestätigen</label>
+            <input className="auth-input" type="password"
+              style={{ ...css.input, marginBottom: error ? 10 : 24, transition: 'border-color 0.15s', borderColor: confirm && confirm !== password ? C.red : C.border }}
+              placeholder="Passwort wiederholen"
+              value={confirm}
+              onChange={e => { setConfirm(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
+            />
+            {error && (
+              <div style={{ background: `${C.red}12`, border: `1px solid ${C.red}44`, borderRadius: 10, padding: '10px 14px', color: C.red, fontSize: 13, marginBottom: 16 }}>{error}</div>
+            )}
+            <button onClick={handleResetPassword} disabled={loading}
+              style={{ width: '100%', padding: '14px', background: loading ? C.light : `linear-gradient(135deg, ${C.indigo}, ${C.purple})`, border: 'none', borderRadius: 12, color: loading ? C.muted : 'white', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading ? 'Speichern…' : 'Passwort speichern'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Login / Register ────────────────────────────────────────────────────────
   if (!user) {
@@ -2462,7 +2596,7 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
               type="password"
               style={{
                 ...css.input,
-                marginBottom: mode === 'register' ? 16 : (error ? 10 : 24),
+                marginBottom: mode === 'register' ? 16 : (error ? 10 : 8),
                 transition: 'border-color 0.15s',
               }}
               placeholder="Mindestens 6 Zeichen"
@@ -2470,6 +2604,22 @@ function AccountScreen({ onNavigate, user, setUser, showToast }) {
               onChange={e => { setPassword(e.target.value); setError(''); }}
               onKeyDown={e => e.key === 'Enter' && handleAuth()}
             />
+
+            {mode === 'login' && (
+              <div style={{ textAlign: 'right', marginBottom: error ? 10 : 16 }}>
+                <button
+                  onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); }}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: C.muted, fontSize: 12,
+                    fontFamily: "'DM Mono', monospace", letterSpacing: '0.06em',
+                    textDecoration: 'underline', padding: 0,
+                  }}
+                >
+                  Passwort vergessen?
+                </button>
+              </div>
+            )}
 
             {mode === 'register' && (
               <>
